@@ -14,6 +14,14 @@ import math
 based on https://people.eecs.berkeley.edu/~jonlong/long_shelhamer_fcn.pdf
 """
 
+_n_samples = 289
+_keep_probability_value = 0.9
+_learning_rate_value = 0.001
+_gpu_count = 0
+_gpu_mem_fraction = 0.9
+_epochs = 0
+_batch_size = 10
+
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), \
     'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
@@ -112,9 +120,6 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
-    n_samples = 289
-    keep_probability_value = 0.9
-    learning_rate_value = 0.001
     sess.run(tf.global_variables_initializer())
     for epoch in range(epochs):
         # running optimization in batches of training set
@@ -126,8 +131,8 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
         for images, labels in batches_pbar:
               feed_dict = {input_image: images,
                            correct_label: labels,
-                           keep_prob: keep_probability_value,
-                           learning_rate: learning_rate_value}
+                           keep_prob: _keep_probability_value,
+                           learning_rate: _learning_rate_value}
               _, loss = sess.run([train_op, cross_entropy_loss], # , self._summaries
                                  feed_dict=feed_dict)
               print("loss={}".format(loss))
@@ -151,9 +156,9 @@ def run():
     # TODO: Train and Inference on the cityscapes dataset instead of the Kitti dataset.
     #  https://www.cityscapes-dataset.com/
 
-    config = tf.ConfigProto(log_device_placement=False, device_count = {'GPU': 0})
+    config = tf.ConfigProto(log_device_placement=False, device_count = {'GPU': _gpu_count})
     config.gpu_options.allow_growth = True
-    config.gpu_options.per_process_gpu_memory_fraction = 0.5
+    config.gpu_options.per_process_gpu_memory_fraction = _gpu_mem_fraction
     with tf.Session(config=config) as sess:
         # Path to vgg model
         vgg_path = os.path.join(data_dir, 'vgg')
@@ -175,13 +180,20 @@ def run():
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
         #tests.test_train_nn(train_nn)
-        epochs = 5
-        batch_size = 5
-        train_nn(sess, epochs, batch_size, get_batches_fn, optimizer, cross_entropy_loss,
+        train_nn(sess, _epochs, _batch_size, get_batches_fn, optimizer, cross_entropy_loss,
                  image_input, correct_label, keep_prob, learning_rate)
 
-        # TODO: Save inference data using helper.save_inference_samples
-        helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, image_input)
+        # Save inference data using helper.save_inference_samples
+        output_dir = helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, image_input)
+        with open(os.path.join(output_dir, "params.txt"), "w") as f:
+            f.write('keep_prob={}\n'.format(_keep_probability_value))
+            f.write('batch={}\n'.format(_batch_size))
+            f.write('epochs={}\n'.format(_epochs))
+            f.write('use_gpu={}\n'.format(_gpu_count))
+            f.write('gpu_mem={}\n'.format(_gpu_mem_fraction))
+            f.write('lr={}\n'.format(_learning_rate_value))
+            f.write('n_samples={}\n'.format(_n_samples))
+            #f.write('n_samples={}'.format(_))
 
         # TODO: Apply the trained model to a video
 
