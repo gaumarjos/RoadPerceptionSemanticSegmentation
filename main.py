@@ -15,12 +15,12 @@ based on https://people.eecs.berkeley.edu/~jonlong/long_shelhamer_fcn.pdf
 """
 
 _n_samples = 289
-_keep_probability_value = 0.9
-_learning_rate_value = 0.001
-_gpu_count = 0
+_keep_probability_value = 0.7
+_learning_rate_value = 0.0001
+_gpu_count = 1
 _gpu_mem_fraction = 0.9
-_epochs = 0
-_batch_size = 10
+_epochs = 100
+_batch_size = 15
 
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), \
