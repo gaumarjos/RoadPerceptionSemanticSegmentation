@@ -131,7 +131,6 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
               _, loss = sess.run([train_op, cross_entropy_loss], # , self._summaries
                                  feed_dict=feed_dict)
               print("loss={}".format(loss))
-              break
               # write training summaries for tensorboard every so often
               #step = self._global_step.eval(session=self._session)
               #if step % 5 == 0:
@@ -176,7 +175,7 @@ def run():
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
         #tests.test_train_nn(train_nn)
-        epochs = 1
+        epochs = 5
         batch_size = 5
         train_nn(sess, epochs, batch_size, get_batches_fn, optimizer, cross_entropy_loss,
                  image_input, correct_label, keep_prob, learning_rate)
