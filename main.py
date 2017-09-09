@@ -15,12 +15,12 @@ based on https://people.eecs.berkeley.edu/~jonlong/long_shelhamer_fcn.pdf
 """
 
 _n_samples = 289
-_keep_probability_value = 0.7
-_learning_rate_value = 0.0001
-_gpu_count = 1
+_keep_probability_value = 0.9
+_learning_rate_value = 0.001
+_gpu_count = 0
 _gpu_mem_fraction = 0.9
-_epochs = 100
-_batch_size = 15
+_epochs = 0
+_batch_size = 10
 
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), \
@@ -121,7 +121,14 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     """
     # TODO: Implement function
     sess.run(tf.global_variables_initializer())
+    """ save intermediate checkpoint during training """
+    saver = tf.train.Saver()  # by default saves all variables
+    checkpoint_dir = 'ckpt'
+    if not os.path.exists(checkpoint_dir):
+        os.makedirs(checkpoint_dir)
+
     for epoch in range(epochs):
+        l = 0.
         # running optimization in batches of training set
         n_batches = int(math.ceil(float(_n_samples) / batch_size))
         batches_pbar = tqdm(get_batches_fn(batch_size),
@@ -136,13 +143,20 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
               _, loss = sess.run([train_op, cross_entropy_loss], # , self._summaries
                                  feed_dict=feed_dict)
               print("loss={}".format(loss))
+              l += loss * len(images)
               # write training summaries for tensorboard every so often
               #step = self._global_step.eval(session=self._session)
               #if step % 5 == 0:
               #    summary_writer.add_summary(summaries, global_step=step)
 
-      #tf.Print(tensor, [tf.shape(tensor)])
+        l /= _n_samples
+        print("loss over epoch {}".format(l))
 
+        save_path = saver.save(sess, checkpoint_dir)  # , global_step=self._global_step)
+        print("checkpoint saved to {}".format(save_path))
+
+        #tf.Print(tensor, [tf.shape(tensor)])
+    return l
 
 def run():
     num_classes = 2
@@ -195,7 +209,17 @@ def run():
             f.write('n_samples={}\n'.format(_n_samples))
             #f.write('n_samples={}'.format(_))
 
-        # TODO: Apply the trained model to a video
+        # save model
+        """ save trained model using SavedModelBuilder """
+        model_dir = os.path.join(output_dir, 'model')
+        print('saving SavedModel into {}'.format(model_dir))
+        builder = tf.saved_model.builder.SavedModelBuilder(model_dir)
+        tag = 'FCN8'
+        builder.add_meta_graph_and_variables(sess, [tag])
+        builder.save()
+
+
+                # TODO: Apply the trained model to a video
 
 
 if __name__ == '__main__':
