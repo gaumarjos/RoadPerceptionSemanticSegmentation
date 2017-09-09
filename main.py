@@ -194,7 +194,7 @@ def run():
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
         #tests.test_train_nn(train_nn)
-        train_nn(sess, _epochs, _batch_size, get_batches_fn, optimizer, cross_entropy_loss,
+        final_loss = train_nn(sess, _epochs, _batch_size, get_batches_fn, optimizer, cross_entropy_loss,
                  image_input, correct_label, keep_prob, learning_rate)
 
         # Save inference data using helper.save_inference_samples
@@ -207,6 +207,7 @@ def run():
             f.write('gpu_mem={}\n'.format(_gpu_mem_fraction))
             f.write('lr={}\n'.format(_learning_rate_value))
             f.write('n_samples={}\n'.format(_n_samples))
+            f.write('final_loss={}\n'.format(final_loss))
             #f.write('n_samples={}'.format(_))
 
         # save model
