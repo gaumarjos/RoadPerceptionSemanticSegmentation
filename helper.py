@@ -97,33 +97,90 @@ def gen_batch_function(data_folder, image_shape):
             yield np.array(images), np.array(gt_images)
     return get_batches_fn
 
+def gen_batch_function_cityscapes(data_folder, image_shape):
+    """
+    Generate function to create batches of training data
+    :param data_folder: Path to folder that contains all the datasets
+    :param image_shape: Tuple - Shape of image
+    :return:
+    """
+    def get_batches_fn(batch_size, n_samples_max=None):
+        """
+        Create batches of training data
+        :param batch_size: Batch Size
+        :return: Batches of training data
+        """
+        image_paths = glob(os.path.join(data_folder, 'leftImg8bit/train/*/*_leftImg8bit.png'))
+        label_paths = {
+            re.sub('_gtFine_labelTrainIds', '_leftImg8bit', os.path.basename(path)): path
+            for path in glob(os.path.join(data_folder, 'gtFine/train/*/*_gtFine_labelTrainIds.png'))}
+        #background_color = np.array([0, 0, 0])
+        num_classes = 35 # 0..34
 
-def gen_test_output(sess, logits, keep_prob, image_pl, data_folder, image_shape):
+        random.shuffle(image_paths)
+        count = 0
+        for batch_i in range(0, len(image_paths), batch_size):
+            images = []
+            gt_images = []
+            for image_file in image_paths[batch_i:batch_i+batch_size]:
+                gt_image_file = label_paths[os.path.basename(image_file)]
+
+                image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
+                gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)
+
+                gt_image = gt_image.reshape(*gt_image.shape, 1)
+                tmp = []
+                for label in range(num_classes):
+                  color = np.array([label, label, label])
+                  gt_bg = np.all(gt_image == color, axis=2)
+                  gt_bg = gt_bg.reshape(*gt_bg.shape, 1)
+                  tmp.append(gt_bg)
+                gt_image = np.concatenate(tmp, axis=2)
+
+                images.append(image)
+                gt_images.append(gt_image)
+                count += 1
+                if n_samples_max is not None and n_samples_max == count:
+                    break
+
+            yield np.array(images), np.array(gt_images)
+            if n_samples_max is not None and n_samples_max == count:
+                break
+    return get_batches_fn
+
+
+def gen_test_output(sess, logits, keep_prob, image_pl, data_path, image_shape):
     """
     Generate test output using the test images
     :param sess: TF session
     :param logits: TF Tensor for the logits
     :param keep_prob: TF Placeholder for the dropout keep robability
     :param image_pl: TF Placeholder for the image placeholder
-    :param data_folder: Path to the folder that contains the datasets
+    :param data_path: Path to the folder that contains the datasets
     :param image_shape: Tuple - Shape of image
     :return: Output for for each test image
     """
 
-    for image_file in tqdm(glob(os.path.join(data_folder, 'image_2', '*.png'))):
+    from labels import labels, trainId2label
+
+    for image_file in tqdm(glob(data_path)):
         image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
+        result_im = scipy.misc.toimage(image)
 
         im_softmax = sess.run(
             [tf.nn.softmax(logits)],
             {keep_prob: 1.0, image_pl: [image]})
-        im_softmax = im_softmax[0][:, 1].reshape(image_shape[0], image_shape[1])
-        segmentation = (im_softmax > 0.5).reshape(image_shape[0], image_shape[1], 1)
-        mask = np.dot(segmentation, np.array([[0, 255, 0, 127]]))
-        mask = scipy.misc.toimage(mask, mode="RGBA")
-        street_im = scipy.misc.toimage(image)
-        street_im.paste(mask, box=None, mask=mask)
+        num_classes = im_softmax[0].shape[1]
+        softmax_result = im_softmax[0].reshape(image_shape[0], image_shape[1], num_classes)
+        #im_softmax = im_softmax[0][:, 1].reshape(image_shape[0], image_shape[1])
+        for label in range(num_classes):
+            segmentation = (softmax_result[:,:,label] > 0.5).reshape(image_shape[0], image_shape[1], 1)
+            color = trainId2label[label].color
+            mask = np.dot(segmentation, np.array([color + (127,)]))
+            mask = scipy.misc.toimage(mask, mode="RGBA")
+            result_im.paste(mask, box=None, mask=mask)
 
-        yield os.path.basename(image_file), np.array(street_im)
+        yield os.path.basename(image_file), np.array(result_im)
 
 
 def save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, input_image):
@@ -136,7 +193,7 @@ def save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_p
     # Run NN on test images and save them to HD
     print('Training Finished. Saving test images to: {}'.format(output_dir))
     image_outputs = gen_test_output(
-        sess, logits, keep_prob, input_image, os.path.join(data_dir, 'data_road/testing'), image_shape)
+        sess, logits, keep_prob, input_image, data_dir, image_shape)
     for name, image in tqdm(image_outputs):
         scipy.misc.imsave(os.path.join(output_dir, name), image)
     return output_dir

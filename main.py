@@ -14,13 +14,13 @@ import math
 based on https://people.eecs.berkeley.edu/~jonlong/long_shelhamer_fcn.pdf
 """
 
-_n_samples = 289
+_n_samples = 5
 _keep_probability_value = 0.9
 _learning_rate_value = 0.001
 _gpu_count = 0
 _gpu_mem_fraction = 0.9
-_epochs = 0
-_batch_size = 10
+_epochs = 1
+_batch_size = 1
 
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), \
@@ -131,7 +131,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
         l = 0.
         # running optimization in batches of training set
         n_batches = int(math.ceil(float(_n_samples) / batch_size))
-        batches_pbar = tqdm(get_batches_fn(batch_size),
+        batches_pbar = tqdm(get_batches_fn(batch_size, _n_samples),
                             desc='Train Epoch {:>2}/{}'.format(epoch + 1, epochs),
                             unit='batches',
                             total=n_batches)
@@ -159,26 +159,38 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     return l
 
 def run():
-    num_classes = 2
-    image_shape = (160, 576)
-    data_dir = './data'
-    runs_dir = './runs'
-
+    # kitty dataset
+    #num_classes = 2
+    #image_shape = (160, 576)
+    #data_dir = './data'
+    #runs_dir = './runs'
+    # Create function to get batches
+    #get_batches_fn = helper.gen_batch_function(os.path.join(data_dir, 'data_road/training'),
+    #                                           image_shape)
+    #test_data_dir = os.path.join(data_dir, 'data_road/testing/image_2/*.png')
     #tests.test_for_kitti_dataset(data_dir)
-    # Download pretrained vgg model
-    helper.maybe_download_pretrained_vgg(data_dir)
-    # TODO: Train and Inference on the cityscapes dataset instead of the Kitti dataset.
+
+    # cityscapes
     #  https://www.cityscapes-dataset.com/
+    num_classes = 35
+    image_shape = (256, 512)
+    data_dir = '../cityscapes/data'
+    runs_dir = './runs_city'
+    # Create function to get batches
+    get_batches_fn = helper.gen_batch_function_cityscapes(os.path.join(data_dir, ''), image_shape)
+    test_data_dir = os.path.join(data_dir, 'leftImg8bit/test/*/*.png')
+
+    # Download pretrained vgg model
+    model_dir = './data'
+    helper.maybe_download_pretrained_vgg(model_dir)
 
     config = tf.ConfigProto(log_device_placement=False, device_count = {'GPU': _gpu_count})
     config.gpu_options.allow_growth = True
     config.gpu_options.per_process_gpu_memory_fraction = _gpu_mem_fraction
     with tf.Session(config=config) as sess:
-        # Path to vgg model
-        vgg_path = os.path.join(data_dir, 'vgg')
-        # Create function to get batches
-        get_batches_fn = helper.gen_batch_function(os.path.join(data_dir, 'data_road/training'), image_shape)
 
+        # Path to vgg model
+        vgg_path = os.path.join(model_dir, 'vgg')
         #tests.test_load_vgg(load_vgg, tf)
         image_input, keep_prob, l3, l4, l7 = load_vgg(sess, vgg_path)
         correct_label = tf.placeholder(tf.float32, name='label_input')
@@ -198,9 +210,11 @@ def run():
                  image_input, correct_label, keep_prob, learning_rate)
 
         # Save inference data using helper.save_inference_samples
-        output_dir = helper.save_inference_samples(runs_dir, data_dir, sess, image_shape, logits, keep_prob, image_input)
+        output_dir = helper.save_inference_samples(runs_dir, test_data_dir, sess, image_shape, logits, keep_prob, image_input)
         with open(os.path.join(output_dir, "params.txt"), "w") as f:
             f.write('keep_prob={}\n'.format(_keep_probability_value))
+            f.write('data_dir={}\n'.format(data_dir))
+            f.write('n_samples={}\n'.format(_n_samples))
             f.write('batch={}\n'.format(_batch_size))
             f.write('epochs={}\n'.format(_epochs))
             f.write('use_gpu={}\n'.format(_gpu_count))
