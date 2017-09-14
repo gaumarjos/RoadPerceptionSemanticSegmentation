@@ -162,7 +162,7 @@ def gen_test_output(sess, logits, keep_prob, image_pl, data_path, image_shape):
     """
 
     from labels import labels, trainId2label
-
+    transparency_level = 56
     for image_file in tqdm(glob(data_path)):
         image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
         result_im = scipy.misc.toimage(image)
@@ -176,7 +176,7 @@ def gen_test_output(sess, logits, keep_prob, image_pl, data_path, image_shape):
         for label in range(num_classes):
             segmentation = (softmax_result[:,:,label] > 0.5).reshape(image_shape[0], image_shape[1], 1)
             color = trainId2label[label].color
-            mask = np.dot(segmentation, np.array([color + (127,)]))
+            mask = np.dot(segmentation, np.array([color + (transparency_level,)]))
             mask = scipy.misc.toimage(mask, mode="RGBA")
             result_im.paste(mask, box=None, mask=mask)
 
