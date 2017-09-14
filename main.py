@@ -17,7 +17,7 @@ based on https://people.eecs.berkeley.edu/~jonlong/long_shelhamer_fcn.pdf
 _n_samples = 2975
 _keep_probability_value = 0.9
 _learning_rate_value = 0.0001
-_gpu_count = 1
+_gpu_count = 0
 _gpu_mem_fraction = 0.9
 _epochs = 1
 _batch_size = 5
@@ -121,13 +121,12 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     """
     """ save intermediate checkpoint during training """
     saver = tf.train.Saver()  # by default saves all variables
-    checkpoint_dir = 'ckpt'
-    if not os.path.exists(checkpoint_dir):
-        os.makedirs(checkpoint_dir)
-    else:
-      ckpt = tf.train.get_checkpoint_state(os.path.dirname(checkpoint_dir))
-      # if that checkpoint exists, restore from checkpoint
-      if ckpt and ckpt.model_checkpoint_path:
+    if not os.path.exists('ckpt'):
+        os.makedirs('ckpt')
+    checkpoint_dir = 'ckpt/model.ckpt'
+    ckpt = tf.train.get_checkpoint_state(os.path.dirname(checkpoint_dir))
+    # if that checkpoint exists, restore from checkpoint
+    if ckpt and ckpt.model_checkpoint_path:
         saver.restore(sess, ckpt.model_checkpoint_path)
         print("restored from checkpoint {}".format(ckpt.model_checkpoint_path))
        
@@ -159,7 +158,7 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
         l /= _n_samples
         #batches_pbar.set_description("loss over last epoch {}".format(l))
 
-        save_path = saver.save(sess, checkpoint_dir+"/ckpt")  # , global_step=self._global_step)
+        save_path = saver.save(sess, checkpoint_dir)  # , global_step=self._global_step)
         #print("checkpoint saved to {}".format(save_path))
 
     return l
