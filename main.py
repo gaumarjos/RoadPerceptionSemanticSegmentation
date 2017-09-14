@@ -19,7 +19,7 @@ _keep_probability_value = 0.9
 _learning_rate_value = 0.001
 _gpu_count = 0
 _gpu_mem_fraction = 0.9
-_epochs = 1
+_epochs = 2
 _batch_size = 1
 
 # Check TensorFlow Version
@@ -128,13 +128,14 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
         os.makedirs(checkpoint_dir)
 
     for epoch in range(epochs):
-        l = 0.
         # running optimization in batches of training set
         n_batches = int(math.ceil(float(_n_samples) / batch_size))
         batches_pbar = tqdm(get_batches_fn(batch_size, _n_samples),
-                            desc='Train Epoch {:>2}/{}'.format(epoch + 1, epochs),
+                            desc='Train Epoch {:>2}/{} (loss _.___)'.format(epoch + 1, epochs),
                             unit='batches',
                             total=n_batches)
+        n = 0.
+        l = 0.
         for images, labels in batches_pbar:
               feed_dict = {input_image: images,
                            correct_label: labels,
@@ -142,20 +143,20 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
                            learning_rate: _learning_rate_value}
               _, loss = sess.run([train_op, cross_entropy_loss], # , self._summaries
                                  feed_dict=feed_dict)
-              print("loss={}".format(loss))
+              n += len(images)
               l += loss * len(images)
+              batches_pbar.set_description('Train Epoch {:>2}/{} (loss {:.3f})'.format(epoch + 1, epochs, l/n))
               # write training summaries for tensorboard every so often
               #step = self._global_step.eval(session=self._session)
               #if step % 5 == 0:
               #    summary_writer.add_summary(summaries, global_step=step)
 
         l /= _n_samples
-        print("loss over epoch {}".format(l))
+        #batches_pbar.set_description("loss over last epoch {}".format(l))
 
         save_path = saver.save(sess, checkpoint_dir)  # , global_step=self._global_step)
-        print("checkpoint saved to {}".format(save_path))
+        #print("checkpoint saved to {}".format(save_path))
 
-        #tf.Print(tensor, [tf.shape(tensor)])
     return l
 
 def run():
