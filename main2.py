@@ -95,7 +95,7 @@ def run():
         model = fcn8vgg16.FCN8_VGG16(images_shape, labels_shape)
 
         # run default initialisers
-        #sess.run(tf.global_variables_initializer())
+        sess.run(tf.global_variables_initializer())
         # restore trained weights for VGG
         for var in model._parameters:
             name = var.name.replace('encoder_vgg16/', '').replace(':0','')
