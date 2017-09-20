@@ -93,9 +93,9 @@ def run():
         images_shape = (None,)+image_shape+(3,)
         labels_shape = (None,)+image_shape+(num_classes,)
         model = fcn8vgg16.FCN8_VGG16(images_shape, labels_shape)
-        # run default initialisers
-        sess.run(tf.global_variables_initializer())
 
+        # run default initialisers
+        #sess.run(tf.global_variables_initializer())
         # restore trained weights for VGG
         for var in model._parameters:
             name = var.name.replace('encoder_vgg16/', '').replace(':0','')
@@ -104,7 +104,7 @@ def run():
                 # this is weird -- Udacity provided model has weights shape of (7,7,512,4096)
                 # but it should be (1,1,512,4096). lets take just one filter
                 value = value[4:5,4:5,:,:]
-            tf.assign(var, value)
+            sess.run(var.assign(value))
 
         # TODO: Augment Images for better results
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
