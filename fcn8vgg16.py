@@ -2,6 +2,10 @@ import tensorflow as tf
 import math
 from tqdm import tqdm
 import os
+import scipy.misc
+from glob import glob
+import numpy as np
+
 
 class FCN8_VGG16:
     def __init__(self, images_shape, labels_shape):
@@ -18,15 +22,6 @@ class FCN8_VGG16:
         self._create_optimizer()
         #if weights is not None and sess is not None:
         #    self.load_weights(weights, sess)
-
-    def _create_optimizer(self):
-        num_classes = self._labels_shape[-1]
-        logits = tf.reshape(self._output, (-1, num_classes), name='logits')
-        # TODO: use weighted loss based on how our classes are represented?
-        self._loss = tf.reduce_mean(
-                                tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=self._labels_float),
-                                name="loss")
-        self._optimizer = tf.train.AdamOptimizer(self._learning_rate).minimize(self._loss)
 
     def train(self, sess, epochs, batch_size, get_batches_fn, n_samples, keep_prob_value, learning_rate):
         """
@@ -85,35 +80,39 @@ class FCN8_VGG16:
                 #     summary, _ = sess.run([merged, train_step], feed_dict=feed_dict(True))
                 #     train_writer.add_summary(summary, i)
 
-            l /= _n_samples
+            l /= n_samples
             # batches_pbar.set_description("loss over last epoch {}".format(l))
 
             save_path = saver.save(sess, checkpoint_dir)  # , global_step=self._global_step)
             # print("checkpoint saved to {}".format(save_path))
         return l
 
-    def _create_decoder(self):
+    def predict(self, sess, data_path):
+        """
+        Generate test output using the test images
+        :param sess: TF session
+        :param data_path: Path to the folder that contains the datasets
+        :param image_shape: Tuple - Shape of image
+        :return: Output for for each test image
+        """
+        from labels import labels, trainId2label
+        transparency_level = 56
         num_classes = self._labels_shape[-1]
-        with tf.name_scope("decoder"):
-            conv_1x1 = tf.layers.conv2d(self._conv7, num_classes, kernel_size=1,
-                                        strides=(1, 1), padding='SAME',
-                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
-                                        name='conv_1x1')
-            # in the paper 'initialise to bilinear interpolation'. here we do random initialization
-            up4 = tf.layers.conv2d_transpose(conv_1x1, 512,
-                                             kernel_size=4, strides=2, padding='SAME',
-                                             kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
-                                             name='up4')
-            skip4 = tf.add(up4, self._pool4, name='skip4')
-            up3 = tf.layers.conv2d_transpose(skip4, 256,
-                                             kernel_size=4, strides=2, padding='SAME',
-                                             kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
-                                             name='up3')
-            skip3 = tf.add(up3, self._pool3, name='skip3')
-            self._output = tf.layers.conv2d_transpose(skip3, num_classes,
-                                             kernel_size=16, strides=8, padding='SAME',
-                                             kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
-                                             name='output')
+        image_shape = self._images_shape[1:3]
+        for image_file in tqdm(glob(data_path)):
+            image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
+            result_im = scipy.misc.toimage(image)
+
+            im_softmax = sess.run( [tf.nn.softmax(self._logits)], {self._keep_prob: 1.0, self._images: [image]})
+            softmax_result = im_softmax[0].reshape(image_shape[0], image_shape[1], num_classes)
+            for label in range(num_classes):
+                segmentation = (softmax_result[:, :, label] > 0.5).reshape(image_shape[0],
+                                                                           image_shape[1], 1)
+                color = trainId2label[label].color
+                mask = np.dot(segmentation, np.array([color + (transparency_level,)]))
+                mask = scipy.misc.toimage(mask, mode="RGBA")
+                result_im.paste(mask, box=None, mask=mask)
+            yield os.path.basename(image_file), np.array(result_im)
 
     def _create_input_pipeline(self):
         # define input placeholders in the graph
@@ -304,3 +303,36 @@ class FCN8_VGG16:
             relu = tf.nn.relu(out, name='relu')
             self._conv7 = tf.nn.dropout(relu, self._keep_prob, name=scope)
             self._parameters += [kernel, biases]
+
+    def _create_decoder(self):
+        num_classes = self._labels_shape[-1]
+        with tf.name_scope("decoder"):
+            conv_1x1 = tf.layers.conv2d(self._conv7, num_classes, kernel_size=1,
+                                        strides=(1, 1), padding='SAME',
+                                        kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                        name='conv_1x1')
+            # in the paper 'initialise to bilinear interpolation'. here we do random initialization
+            up4 = tf.layers.conv2d_transpose(conv_1x1, 512,
+                                             kernel_size=4, strides=2, padding='SAME',
+                                             kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                             name='up4')
+            skip4 = tf.add(up4, self._pool4, name='skip4')
+            up3 = tf.layers.conv2d_transpose(skip4, 256,
+                                             kernel_size=4, strides=2, padding='SAME',
+                                             kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                             name='up3')
+            skip3 = tf.add(up3, self._pool3, name='skip3')
+            self._output = tf.layers.conv2d_transpose(skip3, num_classes,
+                                             kernel_size=16, strides=8, padding='SAME',
+                                             kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
+                                             name='output')
+
+    def _create_optimizer(self):
+        num_classes = self._labels_shape[-1]
+        self._logits = tf.reshape(self._output, (-1, num_classes), name='logits')
+        # TODO: use weighted loss based on how our classes are represented?
+        self._loss = tf.reduce_mean(
+                                tf.nn.softmax_cross_entropy_with_logits(logits=self._logits, labels=self._labels_float),
+                                name="loss")
+        self._optimizer = tf.train.AdamOptimizer(self._learning_rate).minimize(self._loss)
+

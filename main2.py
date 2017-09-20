@@ -3,10 +3,13 @@ import tensorflow as tf
 import helper
 import warnings
 from distutils.version import LooseVersion
-import project_tests as tests
 
 from tqdm import tqdm
-import math
+import shutil
+import scipy.misc
+import time
+
+
 
 import fcn8vgg16
 
@@ -57,7 +60,7 @@ def run():
     num_classes = 35
     image_shape = (256, 512)
     data_dir = '../cityscapes/data'
-    runs_dir = './runs_city'
+    runs_dir = './runs_city2'
     # Create function to get batches
     get_batches_fn = helper.gen_batch_function_cityscapes(os.path.join(data_dir, ''), image_shape)
     test_data_dir = os.path.join(data_dir, 'leftImg8bit/test/*/*.png')
@@ -83,6 +86,8 @@ def run():
             name = name.replace('fc','conv')
             var_values[name] = value
 
+    tf.reset_default_graph()
+
     with tf.Session(config=config) as sess:
         # define our FCN
         images_shape = (None,)+image_shape+(3,)
@@ -95,19 +100,32 @@ def run():
         for var in model._parameters:
             name = var.name.replace('encoder_vgg16/', '').replace(':0','')
             value = var_values[name]
+            if name=='conv6/weights':
+                # this is weird -- Udacity provided model has weights shape of (7,7,512,4096)
+                # but it should be (1,1,512,4096). lets take just one filter
+                value = value[4:5,4:5,:,:]
             tf.assign(var, value)
 
         # TODO: Augment Images for better results
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
         final_loss = model.train(sess, _epochs, _batch_size, get_batches_fn,
-                                 5,#_n_samples,
+                                 _n_samples,
                                  _keep_probability_value, _learning_rate_value)
 
-        return
+        # Make folder for current run
+        output_dir = os.path.join(runs_dir, str(time.time()))
+        if os.path.exists(output_dir):
+            shutil.rmtree(output_dir)
+        os.makedirs(output_dir)
 
-        # Save inference data using helper.save_inference_samples
-        output_dir = helper.save_inference_samples(runs_dir, test_data_dir, sess, image_shape, logits, keep_prob, image_input)
+        # Run NN on test images and save them to HD
+        print('Training Finished. Saving test images to: {}'.format(output_dir))
+        image_outputs = model.predict(sess, test_data_dir)
+        for name, image in tqdm(image_outputs):
+            scipy.misc.imsave(os.path.join(output_dir, name), image)
+
+
         with open(os.path.join(output_dir, "params.txt"), "w") as f:
             f.write('keep_prob={}\n'.format(_keep_probability_value))
             f.write('data_dir={}\n'.format(data_dir))
@@ -119,7 +137,6 @@ def run():
             f.write('lr={}\n'.format(_learning_rate_value))
             f.write('n_samples={}\n'.format(_n_samples))
             f.write('final_loss={}\n'.format(final_loss))
-            #f.write('n_samples={}'.format(_))
 
         # save model
         """ save trained model using SavedModelBuilder """
@@ -130,8 +147,8 @@ def run():
         builder.add_meta_graph_and_variables(sess, [tag])
         builder.save()
 
+        # TODO: Apply the trained model to a video
 
-                # TODO: Apply the trained model to a video
 
 
 if __name__ == '__main__':
