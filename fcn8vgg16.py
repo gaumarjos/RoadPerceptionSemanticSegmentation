@@ -22,6 +22,8 @@ class FCN8_VGG16:
         self._create_predictions()
         self._create_optimizer()
         self._summaries = tf.summary.merge_all()
+        self._tag = 'FCN8'
+
 
     def restore_variables(self, sess, var_values):
         # restore trained weights for VGG
@@ -33,6 +35,23 @@ class FCN8_VGG16:
                 # but it should be (1,1,512,4096). lets take just one filter
                 value = value[4:5,4:5,:,:]
             sess.run(var.assign(value))
+
+    def load_model(self, sess, model_dir):
+        """ load trained model using SavedModelBuilder. can only be used for inference """
+        #tf.reset_default_graph()
+        sess.run(tf.global_variables_initializer())
+        tf.saved_model.loader.load(sess, [self._tag], model_dir)
+        # we need to re-assign the following ops to instance variables for prediction
+        # we cannot continue training from this state as other instance variables are undefined
+        graph = tf.get_default_graph()
+        self._images = graph.get_tensor_by_name("data/images:0")
+        self._keep_prob = graph.get_tensor_by_name("keep_prob:0")
+        self._prediction_class = graph.get_tensor_by_name("predictions/prediction_class:0")
+
+    def save_model(self, model_dir):
+        builder = tf.saved_model.builder.SavedModelBuilder(model_dir)
+        builder.add_meta_graph_and_variables(sess, [self._tag])
+        builder.save()
 
     def train(self, sess,
               epochs, batch_size, get_batches_fn, n_samples,
@@ -65,6 +84,7 @@ class FCN8_VGG16:
         if step > 0:
             print("continuing training after {} steps done previously".format(step))
 
+        l = 0.
         for epoch in range(epochs):
             # running optimization in batches of training set
             n_batches = int(math.ceil(float(n_samples) / batch_size))
@@ -120,7 +140,6 @@ class FCN8_VGG16:
         Generate test output using the test images
         :param sess: TF session
         :param data_path: Path to the folder that contains the datasets
-        :param image_shape: Tuple - Shape of image
         :return: Output for for each test image
         """
         from labels import labels, trainId2label
@@ -131,8 +150,10 @@ class FCN8_VGG16:
             image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
             result_im = scipy.misc.toimage(image)
             predicted_class = sess.run( [self._prediction_class], {self._keep_prob: 1.0, self._images: [image]})
+            predicted_class = predicted_class[0]
+            predicted_class = predicted_class[0,:,:,:]
             for label in range(num_classes):
-                segmentation = (predicted_class == label)
+                segmentation = np.expand_dims(predicted_class[:,:,label], axis=2)
                 color = trainId2label[label].color
                 mask = np.dot(segmentation, np.array([color + (transparency_level,)]))
                 mask = scipy.misc.toimage(mask, mode="RGBA")
