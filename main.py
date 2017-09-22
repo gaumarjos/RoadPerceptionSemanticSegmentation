@@ -1,17 +1,18 @@
 import os.path
 import tensorflow as tf
-import helper
 import warnings
 from distutils.version import LooseVersion
-import project_tests as tests
-
 from tqdm import tqdm
 import math
+
+import helper
 
 
 """Semantic Segmentation with Fully Convolutional Networks
 
-based on https://people.eecs.berkeley.edu/~jonlong/long_shelhamer_fcn.pdf
+Architecture as in https://people.eecs.berkeley.edu/~jonlong/long_shelhamer_fcn.pdf.
+
+Training on Cityscapes dataset.
 """
 
 _n_samples = 2975
@@ -22,16 +23,6 @@ _gpu_mem_fraction = 0.9
 _epochs = 1
 _batch_size = 5
 
-# Check TensorFlow Version
-assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), \
-    'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
-print('TensorFlow Version: {}'.format(tf.__version__))
-
-# Check for a GPU
-if not tf.test.gpu_device_name():
-    warnings.warn('No GPU found. Please use a GPU to train your neural network.')
-else:
-    print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
 
 
 def load_vgg(sess, vgg_path):
@@ -244,4 +235,16 @@ def run():
 
 
 if __name__ == '__main__':
+    # Check TensorFlow Version
+    assert LooseVersion(tf.__version__) >= LooseVersion(
+        '1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(
+        tf.__version__)
+    print('TensorFlow Version: {}'.format(tf.__version__))
+
+    # Check for a GPU
+    if not tf.test.gpu_device_name():
+        warnings.warn('No GPU found. Please use a GPU to train your neural network.')
+    else:
+        print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+
     run()
