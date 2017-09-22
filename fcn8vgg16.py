@@ -111,7 +111,7 @@ class FCN8_VGG16:
                     'Train Epoch {:>2}/{} (loss {:.3f})'.format(epoch + 1, epochs, l / n))
                 # write training summaries for tensorboard every so often
                 step = self._global_step.eval(session=sess)
-                if step % 5 == 0 and summaries_dir is not None:
+                if step % 20 == 0 and summaries_dir is not None:
                     summary_writer.add_summary(summaries, global_step=step)
                 # if i % 100 == 99:  # Record execution stats
                 #     run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
