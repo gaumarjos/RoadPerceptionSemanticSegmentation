@@ -61,6 +61,8 @@ def run():
     image_shape = (256, 512)
     data_dir = '../cityscapes/data'
     runs_dir = './runs_city2'
+    ckpt_dir = 'ckpt2'
+    summaries_dir = 'summaries'
     # Create function to get batches
     get_batches_fn = helper.gen_batch_function_cityscapes(os.path.join(data_dir, ''), image_shape)
     test_data_dir = os.path.join(data_dir, 'leftImg8bit/test/*/*.png')
@@ -94,24 +96,17 @@ def run():
         labels_shape = (None,)+image_shape+(num_classes,)
         model = fcn8vgg16.FCN8_VGG16(images_shape, labels_shape)
 
-        # run default initialisers
+        # variables initialization
         sess.run(tf.global_variables_initializer())
-        # restore trained weights for VGG
-        for var in model._parameters:
-            name = var.name.replace('encoder_vgg16/', '').replace(':0','')
-            value = var_values[name]
-            if name=='conv6/weights':
-                # this is weird -- Udacity provided model has weights shape of (7,7,512,4096)
-                # but it should be (1,1,512,4096). lets take just one filter
-                value = value[4:5,4:5,:,:]
-            sess.run(var.assign(value))
+        model.restore_variables(sess, var_values)
 
         # TODO: Augment Images for better results
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
         final_loss = model.train(sess, _epochs, _batch_size, get_batches_fn,
                                  _n_samples,
-                                 _keep_probability_value, _learning_rate_value)
+                                 _keep_probability_value, _learning_rate_value,
+                                 ckpt_dir, summaries_dir)
 
         # Make folder for current run
         output_dir = os.path.join(runs_dir, str(time.time()))

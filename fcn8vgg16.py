@@ -19,11 +19,25 @@ class FCN8_VGG16:
             self._create_vgg16_conv_layers()
             self._create_vgg16_fc_conv_layers()
         self._create_decoder()
+        self._create_predictions()
         self._create_optimizer()
-        #if weights is not None and sess is not None:
-        #    self.load_weights(weights, sess)
+        self._summaries = tf.summary.merge_all()
 
-    def train(self, sess, epochs, batch_size, get_batches_fn, n_samples, keep_prob_value, learning_rate):
+    def restore_variables(self, sess, var_values):
+        # restore trained weights for VGG
+        for var in self._parameters:
+            name = var.name.replace('encoder_vgg16/', '').replace(':0','')
+            value = var_values[name]
+            if name=='conv6/weights':
+                # this is weird -- Udacity provided model has weights shape of (7,7,512,4096)
+                # but it should be (1,1,512,4096). lets take just one filter
+                value = value[4:5,4:5,:,:]
+            sess.run(var.assign(value))
+
+    def train(self, sess,
+              epochs, batch_size, get_batches_fn, n_samples,
+              keep_prob_value, learning_rate,
+              ckpt_dir=None, summaries_dir=None):
         """
         Train neural network and print out the loss during training.
         :param sess: TF Session
@@ -31,16 +45,25 @@ class FCN8_VGG16:
         :param batch_size: Batch size
         :param get_batches_fn: Function to get batches of training data.  Call using get_batches_fn(batch_size)
         """
-        # save intermediate checkpoint during training
-        saver = tf.train.Saver()  # by default saves all variables
-        if not os.path.exists('ckpt2'):
-            os.makedirs('ckpt2')
-        checkpoint_dir = 'ckpt2/model.ckpt'
-        ckpt = tf.train.get_checkpoint_state(os.path.dirname(checkpoint_dir))
-        # if that checkpoint exists, restore from checkpoint
-        if ckpt and ckpt.model_checkpoint_path:
-            saver.restore(sess, ckpt.model_checkpoint_path)
-            print("restored from checkpoint {}".format(ckpt.model_checkpoint_path))
+        # restore from checkpoint if needed
+        if ckpt_dir is None:
+            saver = None
+        else:
+            saver = tf.train.Saver()  # by default saves all variables
+            if not os.path.exists(ckpt_dir):
+                os.makedirs(ckpt_dir)
+            checkpoint_dir = os.path.join(ckpt_dir, 'fcn8vgg16')
+            ckpt = tf.train.get_checkpoint_state(os.path.dirname(checkpoint_dir))
+            if ckpt and ckpt.model_checkpoint_path:
+                saver.restore(sess, ckpt.model_checkpoint_path)
+                print("restored from checkpoint {}".format(ckpt.model_checkpoint_path))
+
+        if summaries_dir is not None:
+            summary_writer = tf.summary.FileWriter(summaries_dir, graph=sess.graph)
+
+        step = self._global_step.eval(session=sess)
+        if step > 0:
+            print("continuing training after {} steps done previously".format(step))
 
         for epoch in range(epochs):
             # running optimization in batches of training set
@@ -56,16 +79,20 @@ class FCN8_VGG16:
                              self._labels: labels,
                              self._keep_prob: keep_prob_value,
                              self._learning_rate: learning_rate}
-                _, loss = sess.run([self._optimizer, self._loss],  # , self._summaries
-                                   feed_dict=feed_dict)
+                _, loss, summaries, _, _ = sess.run([self._optimizer,
+                                                     self._loss,
+                                                     self._summaries,
+                                                     self._prediction_class_idx,
+                                                     self._batch_mean_iou],
+                                              feed_dict=feed_dict)
                 n += len(images)
                 l += loss * len(images)
                 batches_pbar.set_description(
                     'Train Epoch {:>2}/{} (loss {:.3f})'.format(epoch + 1, epochs, l / n))
                 # write training summaries for tensorboard every so often
-                # step = self._global_step.eval(session=self._session)
-                # if step % 5 == 0:
-                #    summary_writer.add_summary(summaries, global_step=step)
+                step = self._global_step.eval(session=sess)
+                if step % 5 == 0 and summaries_dir is not None:
+                    summary_writer.add_summary(summaries, global_step=step)
                 # if i % 100 == 99:  # Record execution stats
                 #     run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
                 #     run_metadata = tf.RunMetadata()
@@ -83,8 +110,9 @@ class FCN8_VGG16:
             l /= n_samples
             # batches_pbar.set_description("loss over last epoch {}".format(l))
 
-            save_path = saver.save(sess, checkpoint_dir)  # , global_step=self._global_step)
-            # print("checkpoint saved to {}".format(save_path))
+            if saver is not None:
+                save_path = saver.save(sess, checkpoint_dir, global_step=self._global_step)
+                # print("checkpoint saved to {}".format(save_path))
         return l
 
     def predict(self, sess, data_path):
@@ -102,12 +130,9 @@ class FCN8_VGG16:
         for image_file in tqdm(glob(data_path)):
             image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
             result_im = scipy.misc.toimage(image)
-
-            im_softmax = sess.run( [tf.nn.softmax(self._logits)], {self._keep_prob: 1.0, self._images: [image]})
-            softmax_result = im_softmax[0].reshape(image_shape[0], image_shape[1], num_classes)
+            predicted_class = sess.run( [self._prediction_class], {self._keep_prob: 1.0, self._images: [image]})
             for label in range(num_classes):
-                segmentation = (softmax_result[:, :, label] > 0.5).reshape(image_shape[0],
-                                                                           image_shape[1], 1)
+                segmentation = (predicted_class == label)
                 color = trainId2label[label].color
                 mask = np.dot(segmentation, np.array([color + (transparency_level,)]))
                 mask = scipy.misc.toimage(mask, mode="RGBA")
@@ -132,19 +157,25 @@ class FCN8_VGG16:
         # conv1_1
         with tf.name_scope('conv1_1') as scope:
             kernel = tf.Variable(tf.truncated_normal([3, 3, 3, 64], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(self._images_std, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[64], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             conv1_1 = tf.nn.relu(out, name=scope)
+            #tf.summary.histogram('activations', conv1_1)
             self._parameters += [kernel, biases]
 
         # conv1_2
         with tf.name_scope('conv1_2') as scope:
             kernel = tf.Variable(tf.truncated_normal([3, 3, 64, 64], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(conv1_1, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[64], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             conv1_2 = tf.nn.relu(out, name=scope)
+            #tf.summary.histogram('activations', conv1_1)
             self._parameters += [kernel, biases]
 
         # pool1
@@ -157,19 +188,25 @@ class FCN8_VGG16:
         # conv2_1
         with tf.name_scope('conv2_1') as scope:
             kernel = tf.Variable(tf.truncated_normal([3, 3, 64, 128], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(pool1, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[128], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             conv2_1 = tf.nn.relu(out, name=scope)
+            #tf.summary.histogram('activations', conv1_1)
             self._parameters += [kernel, biases]
 
         # conv2_2
         with tf.name_scope('conv2_2') as scope:
             kernel = tf.Variable(tf.truncated_normal([3, 3, 128, 128], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(conv2_1, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[128], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             conv2_2 = tf.nn.relu(out, name=scope)
+            #tf.summary.histogram('activations', conv1_1)
             self._parameters += [kernel, biases]
 
         # pool2
@@ -182,28 +219,37 @@ class FCN8_VGG16:
         # conv3_1
         with tf.name_scope('conv3_1') as scope:
             kernel = tf.Variable(tf.truncated_normal([3, 3, 128, 256], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(pool2, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[256], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             conv3_1 = tf.nn.relu(out, name=scope)
+            #tf.summary.histogram('activations', conv1_1)
             self._parameters += [kernel, biases]
 
         # conv3_2
         with tf.name_scope('conv3_2') as scope:
             kernel = tf.Variable(tf.truncated_normal([3, 3, 256, 256], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(conv3_1, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[256], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             conv3_2 = tf.nn.relu(out, name=scope)
+            #tf.summary.histogram('activations', conv1_1)
             self._parameters += [kernel, biases]
 
         # conv3_3
         with tf.name_scope('conv3_3') as scope:
             kernel = tf.Variable(tf.truncated_normal([3, 3, 256, 256], dtype=tf.float32, stddev=1e-1), name='weights')
             conv = tf.nn.conv2d(conv3_2, kernel, [1, 1, 1, 1], padding='SAME')
+            tf.summary.histogram("weights", kernel)
             biases = tf.Variable(tf.constant(0.0, shape=[256], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             conv3_3 = tf.nn.relu(out, name=scope)
+            #tf.summary.histogram('activations', conv1_1)
             self._parameters += [kernel, biases]
 
         # pool3
@@ -216,28 +262,37 @@ class FCN8_VGG16:
         # conv4_1
         with tf.name_scope('conv4_1') as scope:
             kernel = tf.Variable(tf.truncated_normal([3, 3, 256, 512], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(self._pool3, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[512], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             conv4_1 = tf.nn.relu(out, name=scope)
+            #tf.summary.histogram('activations', conv1_1)
             self._parameters += [kernel, biases]
 
         # conv4_2
         with tf.name_scope('conv4_2') as scope:
             kernel = tf.Variable(tf.truncated_normal([3, 3, 512, 512], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(conv4_1, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[512], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             conv4_2 = tf.nn.relu(out, name=scope)
+            #tf.summary.histogram('activations', conv1_1)
             self._parameters += [kernel, biases]
 
         # conv4_3
         with tf.name_scope('conv4_3') as scope:
             kernel = tf.Variable(tf.truncated_normal([3, 3, 512, 512], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(conv4_2, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[512], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             conv4_3 = tf.nn.relu(out, name=scope)
+            #tf.summary.histogram('activations', conv1_1)
             self._parameters += [kernel, biases]
 
         # pool4
@@ -250,28 +305,37 @@ class FCN8_VGG16:
         # conv5_1
         with tf.name_scope('conv5_1') as scope:
             kernel = tf.Variable(tf.truncated_normal([3, 3, 512, 512], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(self._pool4, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[512], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             conv5_1 = tf.nn.relu(out, name=scope)
+            #tf.summary.histogram('activations', conv1_1)
             self._parameters += [kernel, biases]
 
         # conv5_2
         with tf.name_scope('conv5_2') as scope:
             kernel = tf.Variable(tf.truncated_normal([3, 3, 512, 512], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(conv5_1, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[512], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             conv5_2 = tf.nn.relu(out, name=scope)
+            #tf.summary.histogram('activations', conv1_1)
             self._parameters += [kernel, biases]
 
         # conv5_3
         with tf.name_scope('conv5_3') as scope:
             kernel = tf.Variable(tf.truncated_normal([3, 3, 512, 512], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(conv5_2, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[512], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             conv5_3 = tf.nn.relu(out, name=scope)
+            #tf.summary.histogram('activations', conv1_1)
             self._parameters += [kernel, biases]
 
         # pool5
@@ -287,25 +351,65 @@ class FCN8_VGG16:
         # fc1 -> conv6
         with tf.name_scope('conv6') as scope:
             kernel = tf.Variable(tf.truncated_normal([1, 1, 512, 4096], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(self._pool5, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[4096], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             relu = tf.nn.relu(out, name='relu')
             conv6 = tf.nn.dropout(relu, self._keep_prob, name=scope)
+            #tf.summary.histogram('dropout', conv6)
             self._parameters += [kernel, biases]
 
         # fc2 -> conv7
         with tf.name_scope('conv7') as scope:
             kernel = tf.Variable(tf.truncated_normal([1, 1, 4096, 4096], dtype=tf.float32, stddev=1e-1), name='weights')
+            tf.summary.histogram("weights", kernel)
             conv = tf.nn.conv2d(conv6, kernel, [1, 1, 1, 1], padding='SAME')
             biases = tf.Variable(tf.constant(0.0, shape=[4096], dtype=tf.float32), trainable=True, name='biases')
+            tf.summary.histogram("biases", biases)
             out = tf.nn.bias_add(conv, biases)
             relu = tf.nn.relu(out, name='relu')
             self._conv7 = tf.nn.dropout(relu, self._keep_prob, name=scope)
+            #tf.summary.histogram('dropout', conv7)
             self._parameters += [kernel, biases]
 
     def _create_decoder(self):
         num_classes = self._labels_shape[-1]
+        # with tf.name_scope("decoder"):
+        #     with tf.name_scope("1x1"):
+        #         kernel = tf.Variable(tf.truncated_normal([1, 1, 4096, num_classes], dtype=tf.float32, stddev=1e-1), name='weights')
+        #         tf.summary.histogram("weights", kernel)
+        #         conv_1x1 = tf.nn.conv2d(self._conv7, kernel, [1, 1, 1, 1], padding='SAME', name='conv_1x1')
+        #     with tf.name_scope("up4"):
+        #         channels = 512
+        #         kernel = tf.Variable(tf.truncated_normal([4, 4, num_classes, channels], dtype=tf.float32, stddev=1e-1), name='weights')
+        #         tf.summary.histogram("weights", kernel)
+        #         out_shape = [s for s in conv_1x1.get_shape()]
+        #         out_shape[1] *= 2
+        #         out_shape[2] *= 2
+        #         #out_shape[3] = channels
+        #         up4 = tf.nn.conv2d_transpose(conv_1x1, kernel, output_shape=out_shape, strides=[1, 2, 2, 1], padding='SAME', name='up4')
+        #         skip4 = tf.add(up4, self._pool4, name='skip4')
+        #     with tf.name_scope("up4"):
+        #         channels = 256
+        #         kernel = tf.Variable(tf.truncated_normal([4, 4, 512, channels], dtype=tf.float32, stddev=1e-1), name='weights')
+        #         tf.summary.histogram("weights", kernel)
+        #         out_shape = [s for s in skip4.get_shape()]
+        #         out_shape[1] *= 2
+        #         out_shape[2] *= 2
+        #         out_shape[3] = channels
+        #         up3 = tf.nn.conv2d_transpose(skip4, kernel, output_shape=out_shape, strides=[1, 2, 2, 1], padding='SAME', name='up3')
+        #         skip3 = tf.add(up3, self._pool3, name='skip3')
+        #     with tf.name_scope("output"):
+        #         channels = num_classes
+        #         kernel = tf.Variable(tf.truncated_normal([16, 16, 256, channels], dtype=tf.float32, stddev=1e-1), name='weights')
+        #         tf.summary.histogram("weights", kernel)
+        #         out_shape = [s for s in skip3.get_shape()]
+        #         out_shape[1] *= 8
+        #         out_shape[2] *= 8
+        #         out_shape[3] = channels
+        #         self._output = tf.nn.conv2d_transpose(skip3, kernel, output_shape=out_shape, strides=[1,8,8,1], padding='SAME', name='output')
         with tf.name_scope("decoder"):
             conv_1x1 = tf.layers.conv2d(self._conv7, num_classes, kernel_size=1,
                                         strides=(1, 1), padding='SAME',
@@ -327,12 +431,43 @@ class FCN8_VGG16:
                                              kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
                                              name='output')
 
+    def _create_predictions(self):
+        """ define prediction probabilities and classes """
+        with tf.name_scope("predictions"):
+            self._logits = tf.identity(self._output, name='logits')
+            self._prediction_softmax = tf.nn.softmax(self._logits, name="prediction_softmax")
+            self._prediction_class = tf.cast(tf.greater(self._prediction_softmax, 0.5), dtype=tf.float32, name='prediction_class')
+            self._prediction_class_idx = tf.cast(tf.argmax(self._prediction_class, axis=3), dtype=tf.uint8, name='prediction_class_idx')
+            tf.summary.image('prediction_class_idx', tf.expand_dims(self._prediction_class_idx, -1), 1)
+        with tf.name_scope("iou"):
+            mul = tf.multiply(self._prediction_class, self._labels_float)
+            inter = tf.reduce_sum(mul, axis=[1,2], name='intersection')
+            add = tf.add(self._prediction_class, self._labels_float)
+            union = tf.add(tf.cast(tf.count_nonzero(tf.subtract(add, mul), axis=[1,2]), dtype=tf.float32), 1e-6, name='union')
+            self._iou = tf.divide(inter, union, name='iou')
+            tf.summary.histogram("iou", self._iou)
+            self._mean_iou = tf.reduce_mean(self._iou, axis=[1], name='mean_iou')
+            tf.summary.histogram("mean_iou", self._mean_iou)
+            self._batch_mean_iou = tf.reduce_mean(self._mean_iou, name='batch_mean_iou')
+            tf.summary.scalar("batch_mean_iou", self._batch_mean_iou)
+
     def _create_optimizer(self):
-        num_classes = self._labels_shape[-1]
-        self._logits = tf.reshape(self._output, (-1, num_classes), name='logits')
-        # TODO: use weighted loss based on how our classes are represented?
+        # TODO: use weighted loss to re-balance the classes
+        # Can use this https://blog.fineighbor.com/tensorflow-dealing-with-imbalanced-data-eb0108b10701
+        # But it is hard problem to solve with TF at this stage. Could not make tf.gather to work.
+        # Could feed class weight in same way as labels. But do not have time to do this
+        # self._label_weights = tf.tile(tf.reduce_sum(self._labels_float, axis=[1,2], keep_dims=True), [1,tf.shape(self._logits)[1],tf.shape(self._logits)[2], 1])
+        # self._label_weights = tf.reduce_sum(self._labels_float, axis=[1,2])
+        # tf.summary.histogram("label_weights", self._label_weights)
+        # self._loss = tf.losses.sparse_softmax_cross_entropy(labels=self._prediction_class_idx,
+        #                                                     logits=self._logits,
+        #                                                     weights=self._label_weights)
         self._loss = tf.reduce_mean(
                                 tf.nn.softmax_cross_entropy_with_logits(logits=self._logits, labels=self._labels_float),
                                 name="loss")
-        self._optimizer = tf.train.AdamOptimizer(self._learning_rate).minimize(self._loss)
+        tf.summary.scalar('loss', self._loss)
+        self._global_step = tf.Variable(0, dtype=tf.int32, trainable=False, name='global_step')
+        tf.summary.scalar('global_step', self._global_step)
+        self._optimizer = tf.train.AdamOptimizer(self._learning_rate).minimize(self._loss, global_step=self._global_step)
+
 
