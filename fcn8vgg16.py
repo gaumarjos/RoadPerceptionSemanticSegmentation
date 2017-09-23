@@ -7,7 +7,6 @@ import os
 class FCN8_VGG16:
     def __init__(self, images_shape, labels_shape):
         # reset graph
-        tf.reset_default_graph()
         self._images_shape = images_shape
         self._labels_shape = labels_shape
         self._keep_prob = tf.placeholder(tf.float32, name='keep_prob', shape=[])
