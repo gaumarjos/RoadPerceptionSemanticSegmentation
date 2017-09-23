@@ -89,10 +89,11 @@ def train():
         # TODO: Augment Images for better results
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
+        run_name = "/ep{}_b{}_lr{:.6f}_kp{}".format(_epochs, _batch_size, _learning_rate_value, _keep_probability_value)
         final_loss = model.train(sess, _epochs, _batch_size, get_batches_fn,
                                  _n_samples,
                                  _keep_probability_value, _learning_rate_value,
-                                 ckpt_dir, summaries_dir)
+                                 ckpt_dir, summaries_dir+run_name)
 
         # Make folder for current run
         output_dir = os.path.join(runs_dir, str(time.time()))
@@ -117,7 +118,7 @@ def train():
         """ save trained model using SavedModelBuilder """
         model_dir = os.path.join(output_dir, 'model')
         print('saving SavedModel into {}'.format(model_dir))
-        model.save_model(model_dir)
+        model.save_model(sess, model_dir)
 
         # Run NN on test images and save them to HD
         print('Training Finished. Saving test images to: {}'.format(output_dir))

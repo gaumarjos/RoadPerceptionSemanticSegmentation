@@ -48,7 +48,7 @@ class FCN8_VGG16:
         self._keep_prob = graph.get_tensor_by_name("keep_prob:0")
         self._prediction_class = graph.get_tensor_by_name("predictions/prediction_class:0")
 
-    def save_model(self, model_dir):
+    def save_model(self, sess, model_dir):
         builder = tf.saved_model.builder.SavedModelBuilder(model_dir)
         builder.add_meta_graph_and_variables(sess, [self._tag])
         builder.save()
@@ -458,8 +458,9 @@ class FCN8_VGG16:
             self._logits = tf.identity(self._output, name='logits')
             self._prediction_softmax = tf.nn.softmax(self._logits, name="prediction_softmax")
             self._prediction_class = tf.cast(tf.greater(self._prediction_softmax, 0.5), dtype=tf.float32, name='prediction_class')
+            num_classes = self._labels_shape[-1]
             self._prediction_class_idx = tf.cast(tf.argmax(self._prediction_class, axis=3), dtype=tf.uint8, name='prediction_class_idx')
-            tf.summary.image('prediction_class_idx', tf.expand_dims(self._prediction_class_idx, -1), 1)
+            tf.summary.image('prediction_class_idx', tf.expand_dims(tf.div(self._prediction_class_idx, num_classes), -1), 1)
         with tf.name_scope("iou"):
             mul = tf.multiply(self._prediction_class, self._labels_float)
             inter = tf.reduce_sum(mul, axis=[1,2], name='intersection')
