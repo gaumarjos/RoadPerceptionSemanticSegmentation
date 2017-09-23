@@ -85,7 +85,7 @@ class FCN8_VGG16:
         for epoch in range(epochs):
             # running optimization in batches of training set
             n_batches = int(math.ceil(float(n_samples) / batch_size))
-            batches_pbar = tqdm(get_batches_fn(batch_size, n_samples),
+            batches_pbar = tqdm(get_batches_fn(batch_size),
                                 desc='Train Epoch {:>2}/{} (loss _.___)'.format(epoch + 1, epochs),
                                 unit='batches',
                                 total=n_batches)
