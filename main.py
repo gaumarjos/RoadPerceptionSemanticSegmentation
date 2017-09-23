@@ -140,7 +140,7 @@ def train(args, image_shape):
                                  args.ckpt_dir, args.summary_dir+run_name)
 
         # Make folder for current run
-        output_dir = os.path.join(args.runs_dir, timestr)
+        output_dir = os.path.join(args.runs_dir, time_str)
         if os.path.exists(output_dir):
             shutil.rmtree(output_dir)
         os.makedirs(output_dir)
@@ -190,7 +190,8 @@ def predict(args, image_shape):
             model_dir = 'trained_model'
         else:
             model_dir = args.model_dir
-        model.load_model(sess, model_dir)
+        #model.load_model(sess, model_dir)
+        model.restore_checkpoint(sess, args.ckpt_dir)
 
         # Make folder for current run
         output_dir = os.path.join(args.runs_dir, time.strftime("%Y%m%d_%H%M%S"))

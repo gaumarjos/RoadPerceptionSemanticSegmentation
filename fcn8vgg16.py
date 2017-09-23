@@ -6,6 +6,8 @@ import os
 
 class FCN8_VGG16:
     def __init__(self, images_shape, labels_shape):
+        # reset graph
+        tf.reset_default_graph()
         self._images_shape = images_shape
         self._labels_shape = labels_shape
         self._keep_prob = tf.placeholder(tf.float32, name='keep_prob', shape=[])
@@ -49,6 +51,14 @@ class FCN8_VGG16:
         builder = tf.saved_model.builder.SavedModelBuilder(model_dir)
         builder.add_meta_graph_and_variables(sess, [self._tag])
         builder.save()
+
+    def restore_checkpoint(self, sess, checkpoint_dir):
+        """ load saved checkpoint. can be used to continue training model across session """
+        ckpt = tf.train.get_checkpoint_state(checkpoint_dir)
+        # if that checkpoint exists, restore from checkpoint
+        if ckpt and ckpt.model_checkpoint_path:
+            saver = tf.train.Saver()
+            saver.restore(sess, ckpt.model_checkpoint_path)
 
     def train(self, sess,
               epochs, batch_size, get_batches_fn, n_samples,
@@ -108,7 +118,7 @@ class FCN8_VGG16:
                     'Train Epoch {:>2}/{} (loss {:.3f})'.format(epoch + 1, epochs, l / n))
                 # write training summaries for tensorboard every so often
                 step = self._global_step.eval(session=sess)
-                if step % 20 == 0 and summaries_dir is not None:
+                if step % 10 == 0 and summaries_dir is not None:
                     summary_writer.add_summary(summaries, global_step=step)
                 # if i % 100 == 99:  # Record execution stats
                 #     run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
@@ -444,7 +454,7 @@ class FCN8_VGG16:
             self._prediction_class = tf.cast(tf.greater(self._prediction_softmax, 0.5), dtype=tf.float32, name='prediction_class')
             num_classes = self._labels_shape[-1]
             self._prediction_class_idx = tf.cast(tf.argmax(self._prediction_class, axis=3), dtype=tf.uint8, name='prediction_class_idx')
-            tf.summary.image('prediction_class_idx', tf.expand_dims(tf.div(self._prediction_class_idx, num_classes), -1), 1)
+            tf.summary.image('prediction_class_idx', tf.expand_dims(tf.div(tf.cast(self._prediction_class_idx, dtype=tf.float32), float(num_classes)), -1), 1)
         with tf.name_scope("iou"):
             mul = tf.multiply(self._prediction_class, self._labels_float)
             inter = tf.reduce_sum(mul, axis=[1,2], name='intersection')
