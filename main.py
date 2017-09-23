@@ -183,15 +183,15 @@ def predict(args, image_shape):
         images_shape = (None,)+image_shape+(3,)
         num_classes = len(cityscape_labels.labels)
         labels_shape = (None,)+image_shape+(num_classes,)
-        model = fcn8vgg16.FCN8_VGG16(images_shape, labels_shape)
+        model = fcn8vgg16.FCN8_VGG16(images_shape, labels_shape, define_graph=False)
 
         # load saved model
         if args.model_dir is None:
             model_dir = 'trained_model'
         else:
             model_dir = args.model_dir
-        #model.load_model(sess, model_dir)
-        model.restore_checkpoint(sess, args.ckpt_dir)
+        model.load_model(sess, model_dir)
+        #model.restore_checkpoint(sess, args.ckpt_dir)
 
         # Make folder for current run
         output_dir = os.path.join(args.runs_dir, time.strftime("%Y%m%d_%H%M%S"))

@@ -5,23 +5,38 @@ import os
 
 
 class FCN8_VGG16:
-    def __init__(self, images_shape, labels_shape):
-        # reset graph
+    def __init__(self, images_shape, labels_shape, define_graph=True):
+        self._tag = 'FCN8'
         self._images_shape = images_shape
         self._labels_shape = labels_shape
-        self._keep_prob = tf.placeholder(tf.float32, name='keep_prob', shape=[])
-        self._learning_rate = tf.placeholder(tf.float32, name='lr', shape=[])
+        if define_graph:
+            # create entire model graph
+            self._keep_prob = tf.placeholder(tf.float32, name='keep_prob', shape=[])
+            self._learning_rate = tf.placeholder(tf.float32, name='lr', shape=[])
+            self._create_input_pipeline()
+            with tf.name_scope("encoder_vgg16"):
+                self._create_vgg16_conv_layers()
+                self._create_vgg16_fc_conv_layers()
+            self._create_decoder()
+            self._create_predictions()
+            self._create_optimizer()
+            self._summaries = tf.summary.merge_all()
+        else:
+            # the graph will be loaded from saved model files
+            # next call must be with a session object to load_model
+            pass
 
-        self._create_input_pipeline()
-        with tf.name_scope("encoder_vgg16"):
-            self._create_vgg16_conv_layers()
-            self._create_vgg16_fc_conv_layers()
-        self._create_decoder()
-        self._create_predictions()
-        self._create_optimizer()
-        self._summaries = tf.summary.merge_all()
-        self._tag = 'FCN8'
-
+    def load_model(self, sess, model_dir):
+        """ load trained model using SavedModelBuilder. can only be used for inference """
+        # tf.reset_default_graph()
+        # sess.run(tf.global_variables_initializer())
+        tf.saved_model.loader.load(sess, [self._tag], model_dir)
+        # we need to re-assign the following ops to instance variables for prediction
+        # we cannot continue training from this state as other instance variables are undefined
+        graph = tf.get_default_graph()
+        self._images = graph.get_tensor_by_name("data/images:0")
+        self._keep_prob = graph.get_tensor_by_name("keep_prob:0")
+        self._prediction_class = graph.get_tensor_by_name("predictions/prediction_class:0")
 
     def restore_variables(self, sess, var_values):
         # restore trained weights for VGG
@@ -33,18 +48,6 @@ class FCN8_VGG16:
                 # but it should be (1,1,512,4096). lets take just one filter
                 value = value[4:5,4:5,:,:]
             sess.run(var.assign(value))
-
-    def load_model(self, sess, model_dir):
-        """ load trained model using SavedModelBuilder. can only be used for inference """
-        #tf.reset_default_graph()
-        sess.run(tf.global_variables_initializer())
-        tf.saved_model.loader.load(sess, [self._tag], model_dir)
-        # we need to re-assign the following ops to instance variables for prediction
-        # we cannot continue training from this state as other instance variables are undefined
-        graph = tf.get_default_graph()
-        self._images = graph.get_tensor_by_name("data/images:0")
-        self._keep_prob = graph.get_tensor_by_name("keep_prob:0")
-        self._prediction_class = graph.get_tensor_by_name("predictions/prediction_class:0")
 
     def save_model(self, sess, model_dir):
         builder = tf.saved_model.builder.SavedModelBuilder(model_dir)
