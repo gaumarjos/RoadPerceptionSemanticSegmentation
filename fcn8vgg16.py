@@ -160,7 +160,7 @@ class FCN8_VGG16:
         # define input placeholders in the graph
         with tf.name_scope("data"):
             self._images = tf.placeholder(tf.uint8, name='images', shape=self._images_shape)
-            tf.summary.image('input_images', self._images, 3)
+            tf.summary.image('input_images', self._images, max_outputs=2)
             self._labels = tf.placeholder(tf.uint8, name='labels', shape=self._labels_shape)
         # zero-mean input
         with tf.name_scope('preprocess') as scope:
@@ -456,7 +456,7 @@ class FCN8_VGG16:
             self._prediction_class = tf.cast(tf.greater(self._prediction_softmax, 0.5), dtype=tf.float32, name='prediction_class')
             num_classes = self._labels_shape[-1]
             self._prediction_class_idx = tf.cast(tf.argmax(self._prediction_class, axis=3), dtype=tf.uint8, name='prediction_class_idx')
-            tf.summary.image('prediction_class_idx', tf.expand_dims(tf.div(tf.cast(self._prediction_class_idx, dtype=tf.float32), float(num_classes)), -1), 1)
+            tf.summary.image('prediction_class_idx', tf.expand_dims(tf.div(tf.cast(self._prediction_class_idx, dtype=tf.float32), float(num_classes)), -1), max_outputs=2)
         with tf.name_scope("iou"):
             mul = tf.multiply(self._prediction_class, self._labels_float)
             inter = tf.reduce_sum(mul, axis=[1,2], name='intersection')
