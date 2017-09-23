@@ -2,9 +2,6 @@ import tensorflow as tf
 import math
 from tqdm import tqdm
 import os
-import scipy.misc
-from glob import glob
-import numpy as np
 
 
 class FCN8_VGG16:
@@ -135,30 +132,17 @@ class FCN8_VGG16:
                 # print("checkpoint saved to {}".format(save_path))
         return l
 
-    def predict(self, sess, data_path):
+    def predict_one(self, sess, image):
         """
-        Generate test output using the test images
+        Generate prediction for one image
         :param sess: TF session
-        :param data_path: Path to the folder that contains the datasets
-        :return: Output for for each test image
+        :param image: scipy image
+        :return: predicted classes for all pixels in the image
         """
-        from labels import labels, trainId2label
-        transparency_level = 56
-        num_classes = self._labels_shape[-1]
-        image_shape = self._images_shape[1:3]
-        for image_file in tqdm(glob(data_path)):
-            image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
-            result_im = scipy.misc.toimage(image)
-            predicted_class = sess.run( [self._prediction_class], {self._keep_prob: 1.0, self._images: [image]})
-            predicted_class = predicted_class[0]
-            predicted_class = predicted_class[0,:,:,:]
-            for label in range(num_classes):
-                segmentation = np.expand_dims(predicted_class[:,:,label], axis=2)
-                color = trainId2label[label].color
-                mask = np.dot(segmentation, np.array([color + (transparency_level,)]))
-                mask = scipy.misc.toimage(mask, mode="RGBA")
-                result_im.paste(mask, box=None, mask=mask)
-            yield os.path.basename(image_file), np.array(result_im)
+        predicted_class = sess.run( [self._prediction_class], {self._keep_prob: 1.0, self._images: [image]})
+        predicted_class = predicted_class[0]
+        predicted_class = predicted_class[0,:,:,:]
+        return predicted_class
 
     def _create_input_pipeline(self):
         # define input placeholders in the graph

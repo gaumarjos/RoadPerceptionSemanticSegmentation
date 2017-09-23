@@ -199,9 +199,20 @@ def predict(args, image_shape):
         os.makedirs(output_dir)
 
         print('Predicting on test images {} to: {}'.format(args.images_paths, output_dir))
-        image_outputs = model.predict(sess, args.images_paths)
-        for name, image in tqdm(image_outputs):
-            scipy.misc.imsave(os.path.join(output_dir, name), image)
+
+        transparency_level = 56
+        for image_file in tqdm(glob.glob(args.images_paths)):
+            image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
+            result_im = scipy.misc.toimage(image)
+            predicted_class = model.predict_one(sess, image)
+            for label in range(num_classes):
+                segmentation = np.expand_dims(predicted_class[:,:,label], axis=2)
+                color = cityscape_labels.trainId2label[label].color
+                mask = np.dot(segmentation, np.array([color + (transparency_level,)]))
+                mask = scipy.misc.toimage(mask, mode="RGBA")
+                result_im.paste(mask, box=None, mask=mask)
+            segmented_image = np.array(result_im)
+            scipy.misc.imsave(os.path.join(output_dir, os.path.basename(image_file)), segmented_image)
 
 
 
