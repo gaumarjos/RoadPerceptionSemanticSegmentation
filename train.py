@@ -143,7 +143,7 @@ def predict():
         model = fcn8vgg16.FCN8_VGG16(images_shape, labels_shape)
 
         # variables initialization
-        model_dir = 'runs_city2/test/model'
+        model_dir = 'trained_model'
         model.load_model(sess, model_dir)
 
         # Make folder for current run
