@@ -130,8 +130,8 @@ def train(args, image_shape):
         train_batches_fn, num_samples = get_train_batch_generator_cityscapes(args.images_paths,
                                                                              args.labels_paths,
                                                                              image_shape)
-
-        run_name = "/ep{}_b{}_lr{:.6f}_kp{}".format(args.epochs, args.batch_size, args.learning_rate, args.keep_prob)
+        time_str = time.strftime("%Y%m%d_%H%M%S")
+        run_name = "/{}_ep{}_b{}_lr{:.6f}_kp{}".format(time_str, args.epochs, args.batch_size, args.learning_rate, args.keep_prob)
         start_time = time.time()
 
         final_loss = model.train(sess, args.epochs, args.batch_size,
@@ -140,7 +140,7 @@ def train(args, image_shape):
                                  args.ckpt_dir, args.summary_dir+run_name)
 
         # Make folder for current run
-        output_dir = os.path.join(args.runs_dir, time.strftime("%Y%m%d_%H%M%S"))
+        output_dir = os.path.join(args.runs_dir, timestr)
         if os.path.exists(output_dir):
             shutil.rmtree(output_dir)
         os.makedirs(output_dir)
