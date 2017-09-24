@@ -265,12 +265,16 @@ def freeze_graph(args):
     print("{} ops in the frozen graph".format(len(output_graph_def.node)))
 
     # save model in same format as usual
-    print('saving trained model to {}'.format(args.frozen_model_dir))
+    print('saving frozen model as saved_model to {}'.format(args.frozen_model_dir))
     model = fcn8vgg16.FCN8_VGG16(define_graph=False)
     tf.reset_default_graph()
     tf.import_graph_def(output_graph_def, name='')
     with tf.Session() as sess:
         model.save_model(sess, args.frozen_model_dir)
+
+    print('saving frozen model as graph.pb (for transforms) to {}'.format(args.frozen_model_dir))
+    with tf.gfile.GFile(args.frozen_model_dir+'/graph.pb', "wb") as f:
+        f.write(output_graph_def.SerializeToString())
 
 
 
@@ -293,6 +297,7 @@ if __name__ == '__main__':
     parser.add_argument('-sd', '--summary_dir', help='training tensorboard summaries directory. default summaries', type=str, default='summaries')
     parser.add_argument('-md', '--model_dir', help='model directory. default None - model directory is created in runs. needed for predict', type=str, default=None)
     parser.add_argument('-fd', '--frozen_model_dir', help='model directory for frozen graph. for freeze', type=str, default=None)
+    parser.add_argument('-od', '--optimised_model_dir', help='model directory for optimised graph. for optimize', type=str, default=None)
     parser.add_argument('-ip', '--images_paths', help="images path/file pattern. e.g. 'train/img*.png'", type=str, default=None)
     parser.add_argument('-lp', '--labels_paths', help="label images path/file pattern. e.g. 'train/label*.png'", type=str, default=None)
     args = parser.parse_args()
@@ -304,14 +309,6 @@ if __name__ == '__main__':
             args.images_paths = test_images_path_pattern
     if args.labels_paths is None and args.action=='train':
         args.labels_paths = train_labels_path_pattern
-
-    print("action={}".format(args.action))
-    print("gpu={}".format(args.gpu))
-    print('keep_prob={}'.format(args.keep_prob))
-    print('images_paths={}'.format(args.images_paths))
-    print('batch_size={}'.format(args.batch_size))
-    print('epochs={}'.format(args.epochs))
-    print('learning_rate={}'.format(args.learning_rate))
 
     # Check TensorFlow Version
     assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
@@ -328,9 +325,17 @@ if __name__ == '__main__':
 
     image_shape = (256, 512)
 
+    print("action={}".format(args.action))
+    print("gpu={}".format(args.gpu))
     if args.action=='train':
+        print('keep_prob={}'.format(args.keep_prob))
+        print('images_paths={}'.format(args.images_paths))
+        print('batch_size={}'.format(args.batch_size))
+        print('epochs={}'.format(args.epochs))
+        print('learning_rate={}'.format(args.learning_rate))
         train(args, image_shape)
     elif args.action=='predict':
+        print('images_paths={}'.format(args.images_paths))
         predict(args, image_shape)
     elif args.action == 'freeze':
         freeze_graph(args)
