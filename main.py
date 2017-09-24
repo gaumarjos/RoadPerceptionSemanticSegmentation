@@ -178,11 +178,13 @@ def predict(args, image_shape):
     config = tf.ConfigProto(log_device_placement=False, device_count = {'GPU': args.gpu})
     config.gpu_options.allow_growth = True
     config.gpu_options.per_process_gpu_memory_fraction = args.gpu_mem
-
     # playing with JIT level, this can be set to ON_1 or ON_2
-    #jit_level = tf.OptimizerOptions.ON_1 # this works on Ubuntu tf1.3 but does not improve performance
-    jit_level = tf.OptimizerOptions.ON_2
-    config.graph_options.optimizer_options.global_jit_level = jit_level
+    if args.xla is not None:
+        if args.xla==1:
+            jit_level = tf.OptimizerOptions.ON_1 # this works on Ubuntu tf1.3 but does not improve performance
+        if args.xla==2:
+            jit_level = tf.OptimizerOptions.ON_2
+        config.graph_options.optimizer_options.global_jit_level = jit_level
 
     tf.reset_default_graph()
 
@@ -345,7 +347,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('action', help='what to do: train/predict/freeze/optimise', type=str, choices=['train','predict', 'freeze', 'optimise'])
     parser.add_argument('-g', '--gpu', help='number of GPUs to use. default 0 (use CPU)', type=int, default=0)
-    parser.add_argument('--gpu_mem', help='GPU memory fraction to use. default 0.9', type=float, default=0.9)
+    parser.add_argument('-gm','--gpu_mem', help='GPU memory fraction to use. default 0.9', type=float, default=0.9)
+    parser.add_argument('-x','--xla', help='XLA JIT level. default None', type=int, default=None, choices=[1,2])
     parser.add_argument('-ep', '--epochs', help='training epochs. default 0', type=int, default=0)
     parser.add_argument('-bs', '--batch_size', help='training batch size. default 5', type=int, default=5)
     parser.add_argument('-lr', '--learning_rate', help='training learning rate. default 0.0001', type=float, default=0.0001)
