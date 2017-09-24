@@ -1,4 +1,5 @@
 import os.path
+import os
 import warnings
 from distutils.version import LooseVersion
 import shutil
@@ -277,6 +278,13 @@ def freeze_graph(args):
         f.write(output_graph_def.SerializeToString())
 
 
+def optimise_graph(args):
+    """ optimize frozen graph for inference """
+    if args.frozen_model_dir is None:
+        print("for freezing need --frozen_model_dir")
+        return
+    print('calling c++ implementation of graph transform')
+    os.system('./optimise.sh')
 
 if __name__ == '__main__':
 
@@ -285,7 +293,7 @@ if __name__ == '__main__':
     test_images_path_pattern = '../cityscapes/data/leftImg8bit/test/*/*.png'
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', help='what to do: train/predict/freeze', type=str, choices=['train','predict', 'freeze'])
+    parser.add_argument('action', help='what to do: train/predict/freeze/optimise', type=str, choices=['train','predict', 'freeze', 'optimise'])
     parser.add_argument('-g', '--gpu', help='number of GPUs to use. default 0 (use CPU)', type=int, default=0)
     parser.add_argument('--gpu_mem', help='GPU memory fraction to use. default 0.9', type=float, default=0.9)
     parser.add_argument('-ep', '--epochs', help='training epochs. default 0', type=int, default=0)
@@ -339,5 +347,7 @@ if __name__ == '__main__':
         predict(args, image_shape)
     elif args.action == 'freeze':
         freeze_graph(args)
+    elif args.action == 'optimise':
+        optimise_graph(args)
 
         # TODO: Apply the trained model to a video
