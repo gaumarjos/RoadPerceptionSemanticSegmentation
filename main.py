@@ -250,12 +250,12 @@ def freeze_graph(args):
     input_graph_def = graph.as_graph_def()
     print("%d ops in the input graph." % len(input_graph_def.node))
 
-    output_graph_file = args.frozen_model_dir + "/frozen_model.pb"
+    output_graph_file = args.frozen_model_dir + "/saved_model.pb"
     output_node_names = "predictions/prediction_class"
+
 
     with tf.Session() as sess:
         saver.restore(sess, input_checkpoint)
-
         # use a built-in TF helper to export variables to constants
         output_graph_def = tf_graph_util.convert_variables_to_constants(
             sess,
@@ -263,10 +263,18 @@ def freeze_graph(args):
             output_node_names.split(",")
         )
 
-        with tf.gfile.GFile(output_graph_file, "wb") as f:
-            f.write(output_graph_def.SerializeToString())
-        print("frozen graph saved to {}".format(output_graph_file))
-        print("{} ops in the frozen graph".format(len(output_graph_def.node)))
+    model = fcn8vgg16.FCN8_VGG16(define_graph=False)
+    tf.reset_default_graph()
+    tf.import_graph_def(output_graph_def)
+    builder = tf.saved_model.builder.SavedModelBuilder(args.frozen_model_dir)
+    builder.add_meta_graph(tags=[model._tag])
+    builder.save()
+
+
+    #with tf.gfile.GFile(output_graph_file, "wb") as f:
+    #    f.write(output_graph_def.SerializeToString())
+    #print("frozen graph saved to {}".format(output_graph_file))
+    print("{} ops in the frozen graph".format(len(output_graph_def.node)))
 
 
 if __name__ == '__main__':
@@ -317,6 +325,9 @@ if __name__ == '__main__':
         warnings.warn('No GPU found. Please use a GPU to train your neural network.')
     else:
         print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+
+    # set tf logging
+    tf.logging.set_verbosity(tf.logging.INFO)
 
     image_shape = (256, 512)
 
