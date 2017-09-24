@@ -216,6 +216,8 @@ def predict(args, image_shape):
         images_pbar = tqdm(glob.glob(args.images_paths),
                             desc='Predicting (last tf call __ ms)',
                             unit='images')
+        total_duration = 0.
+        count = 0.
         for image_file in images_pbar:
             image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
             result_im = scipy.misc.toimage(image)
@@ -223,7 +225,9 @@ def predict(args, image_shape):
             start_time = timer()
             predicted_class = model.predict_one(sess, image)
             duration = timer() - start_time
-            images_pbar.set_description('Predicting (last tf call {} ms)'.format(int(duration*1000)))
+            total_duration += duration
+            count += 1
+            images_pbar.set_description('Predicting (last tf call {} ms, avg {} ms)'.format(int(duration*1000), int(total_duration/count*1000)))
             #    mac cpu inference is  670ms on trained but unoptimized graph. tf 1.3
             # ubuntu cpu inference is 1360ms on pip tf-gpu 1.3.
             # ubuntu cpu inference is  560ms on custom built tf-gpu 1.3 (cuda+xla).
