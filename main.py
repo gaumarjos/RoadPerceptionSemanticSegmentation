@@ -223,6 +223,7 @@ def predict(args, image_shape):
             # ubuntu cpu inference is 1360ms on pip tf-gpu 1.3.
             # ubuntu cpu inference is  560ms on custom built tf-gpu 1.3 (cuda+xla).
             # ubuntu gpu inference is   18ms on custom built tf-gpu 1.3 (cuda+xla). 580ms total per image. 1.7 fps
+            # quantize_weights increases inference to 50ms
 
             for label in range(num_classes):
                 segmentation = np.expand_dims(predicted_class[:,:,label], axis=2)
@@ -300,6 +301,8 @@ def optimise_graph(args):
     with tf.gfile.Open(output_graph_file, 'rb') as f:
         gd.ParseFromString(f.read())
     tf.import_graph_def(gd, name='')
+    print("{} ops in the optimised graph".format(len(gd.node)))
+
     # save model in same format as usual
     shutil.rmtree(args.optimised_model_dir)
     print('saving optimised model as saved_model to {}'.format(args.optimised_model_dir))
@@ -310,12 +313,23 @@ def optimise_graph(args):
         model.save_model(sess, args.optimised_model_dir)
     shutil.move(args.frozen_model_dir+'/optimised_graph.pb', args.optimised_model_dir)
 
-if __name__ == '__main__':
 
-    train_images_path_pattern = '../cityscapes/data/leftImg8bit/train/*/*_leftImg8bit.png'
-    train_labels_path_pattern = '../cityscapes/data/gtFine/train/*/*_gtFine_labelTrainIds.png'
-    test_images_path_pattern = '../cityscapes/data/leftImg8bit/test/*/*.png'
+def check_tf():
+    # Check TensorFlow Version
+    assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
+    print('TensorFlow Version: {}'.format(tf.__version__))
 
+    # Check for a GPU
+    if args.action=='train' and not tf.test.gpu_device_name():
+        warnings.warn('No GPU found. Please use a GPU to train your neural network.')
+    else:
+        print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+
+    # set tf logging
+    tf.logging.set_verbosity(tf.logging.INFO)
+
+
+def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('action', help='what to do: train/predict/freeze/optimise', type=str, choices=['train','predict', 'freeze', 'optimise'])
     parser.add_argument('-g', '--gpu', help='number of GPUs to use. default 0 (use CPU)', type=int, default=0)
@@ -333,6 +347,15 @@ if __name__ == '__main__':
     parser.add_argument('-ip', '--images_paths', help="images path/file pattern. e.g. 'train/img*.png'", type=str, default=None)
     parser.add_argument('-lp', '--labels_paths', help="label images path/file pattern. e.g. 'train/label*.png'", type=str, default=None)
     args = parser.parse_args()
+    return args
+
+if __name__ == '__main__':
+
+    train_images_path_pattern = '../cityscapes/data/leftImg8bit/train/*/*_leftImg8bit.png'
+    train_labels_path_pattern = '../cityscapes/data/gtFine/train/*/*_gtFine_labelTrainIds.png'
+    test_images_path_pattern = '../cityscapes/data/leftImg8bit/test/*/*.png'
+
+    parse_args()
 
     if args.images_paths is None:
         if args.action=='train':
@@ -342,18 +365,8 @@ if __name__ == '__main__':
     if args.labels_paths is None and args.action=='train':
         args.labels_paths = train_labels_path_pattern
 
-    # Check TensorFlow Version
-    assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
-    print('TensorFlow Version: {}'.format(tf.__version__))
+    check_tf()
 
-    # Check for a GPU
-    if args.action=='train' and not tf.test.gpu_device_name():
-        warnings.warn('No GPU found. Please use a GPU to train your neural network.')
-    else:
-        print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
-
-    # set tf logging
-    tf.logging.set_verbosity(tf.logging.INFO)
 
     image_shape = (256, 512)
 
