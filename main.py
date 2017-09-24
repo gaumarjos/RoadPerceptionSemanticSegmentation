@@ -180,7 +180,8 @@ def predict(args, image_shape):
     config.gpu_options.per_process_gpu_memory_fraction = args.gpu_mem
 
     # playing with JIT level, this can be set to ON_1 or ON_2
-    jit_level = tf.OptimizerOptions.ON_1
+    #jit_level = tf.OptimizerOptions.ON_1 # this works on Ubuntu tf1.3 but does not improve performance
+    jit_level = tf.OptimizerOptions.ON_2
     config.graph_options.optimizer_options.global_jit_level = jit_level
 
     tf.reset_default_graph()
