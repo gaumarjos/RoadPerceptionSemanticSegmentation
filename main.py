@@ -267,7 +267,9 @@ def freeze_graph(args):
     tf.reset_default_graph()
     tf.import_graph_def(output_graph_def)
     builder = tf.saved_model.builder.SavedModelBuilder(args.frozen_model_dir)
-    builder.add_meta_graph(tags=[model._tag])
+    with tf.Session() as sess:
+        builder.add_meta_graph_and_variables(sess, tags=[model._tag])
+    #builder.add_meta_graph(tags=[model._tag])
     builder.save()
 
 
