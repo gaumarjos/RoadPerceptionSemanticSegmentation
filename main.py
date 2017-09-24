@@ -265,7 +265,7 @@ def freeze_graph(args):
 
     model = fcn8vgg16.FCN8_VGG16(define_graph=False)
     tf.reset_default_graph()
-    tf.import_graph_def(output_graph_def)
+    tf.import_graph_def(output_graph_def, name='')
     builder = tf.saved_model.builder.SavedModelBuilder(args.frozen_model_dir)
     with tf.Session() as sess:
         builder.add_meta_graph_and_variables(sess, tags=[model._tag])
