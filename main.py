@@ -265,6 +265,10 @@ def freeze_graph(args):
 
     print("{} ops in the frozen graph".format(len(output_graph_def.node)))
 
+    if os.path.exists(args.frozen_model_dir):
+        shutil.rmtree(args.frozen_model_dir)
+    os.makedirs(args.frozen_model_dir)
+
     # save model in same format as usual
     print('saving frozen model as saved_model to {}'.format(args.frozen_model_dir))
     model = fcn8vgg16.FCN8_VGG16(define_graph=False)
