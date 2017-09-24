@@ -179,6 +179,10 @@ def predict(args, image_shape):
     config.gpu_options.allow_growth = True
     config.gpu_options.per_process_gpu_memory_fraction = args.gpu_mem
 
+    # playing with JIT level, this can be set to ON_1 or ON_2
+    jit_level = tf.OptimizerOptions.ON_1
+    config.graph_options.optimizer_options.global_jit_level = jit_level
+
     tf.reset_default_graph()
 
     with tf.Session(config=config) as sess:
@@ -349,6 +353,9 @@ def parse_args():
     args = parser.parse_args()
     return args
 
+
+
+
 if __name__ == '__main__':
 
     train_images_path_pattern = '../cityscapes/data/leftImg8bit/train/*/*_leftImg8bit.png'
@@ -367,7 +374,7 @@ if __name__ == '__main__':
 
     check_tf()
 
-
+    # this is image size to be read and trained on. predict also uses this
     image_shape = (256, 512)
 
     print("action={}".format(args.action))
