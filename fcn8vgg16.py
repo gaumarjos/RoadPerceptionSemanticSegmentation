@@ -5,7 +5,13 @@ import os
 
 
 class FCN8_VGG16:
-    def __init__(self, images_shape, labels_shape, define_graph=True):
+    def __init__(self, images_shape = None, labels_shape = None, define_graph=True):
+        """ initialize network
+
+        for training we need to set shapes
+
+        for inference just set define_graph=False and call load_model straight away. then use predict only
+        """
         self._tag = 'FCN8'
         self._images_shape = images_shape
         self._labels_shape = labels_shape

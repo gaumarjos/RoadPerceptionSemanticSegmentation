@@ -7,6 +7,7 @@ import argparse
 import glob
 import re
 import random
+from timeit import default_timer as timer
 
 import tensorflow as tf
 from tqdm import tqdm
@@ -180,18 +181,19 @@ def predict(args, image_shape):
 
     with tf.Session(config=config) as sess:
         # define our FCN
-        images_shape = (None,)+image_shape+(3,)
-        num_classes = len(cityscape_labels.labels)
-        labels_shape = (None,)+image_shape+(num_classes,)
-        model = fcn8vgg16.FCN8_VGG16(images_shape, labels_shape, define_graph=False)
+        #images_shape = (None,)+image_shape+(3,)
+        #labels_shape = (None,)+image_shape+(num_classes,)
+
+        #model = fcn8vgg16.FCN8_VGG16(images_shape, labels_shape, define_graph=False)
+        model = fcn8vgg16.FCN8_VGG16(define_graph=False)
 
         # load saved model
         if args.model_dir is None:
             model_dir = 'trained_model'
         else:
             model_dir = args.model_dir
+
         model.load_model(sess, model_dir)
-        #model.restore_checkpoint(sess, args.ckpt_dir)
 
         # Make folder for current run
         output_dir = os.path.join(args.runs_dir, time.strftime("%Y%m%d_%H%M%S"))
@@ -201,11 +203,22 @@ def predict(args, image_shape):
 
         print('Predicting on test images {} to: {}'.format(args.images_paths, output_dir))
 
+        num_classes = len(cityscape_labels.labels)
         transparency_level = 56
-        for image_file in tqdm(glob.glob(args.images_paths)):
+
+        images_pbar = tqdm(glob.glob(args.images_paths),
+                            desc='Predicting (last tf call __ ms)',
+                            unit='images')
+        for image_file in images_pbar:
             image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
             result_im = scipy.misc.toimage(image)
+
+            start_time = timer()
             predicted_class = model.predict_one(sess, image)
+            duration = timer() - start_time
+            images_pbar.set_description('Predicting (last tf call {} ms)'.format(int(duration*1000)))
+            # on mac cpu inference is about 670ms on trained but unoptimized graph
+
             for label in range(num_classes):
                 segmentation = np.expand_dims(predicted_class[:,:,label], axis=2)
                 color = cityscape_labels.trainId2label[label].color
