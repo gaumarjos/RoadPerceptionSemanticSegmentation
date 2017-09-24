@@ -248,12 +248,11 @@ def freeze_graph(args):
     saver = tf.train.import_meta_graph(input_checkpoint + '.meta', clear_devices=True)
     graph = tf.get_default_graph()
     input_graph_def = graph.as_graph_def()
-    print("%d ops in the input graph." % len(input_graph_def.node))
+    print("{} ops in the input graph".format(len(input_graph_def.node)))
 
-    output_graph_file = args.frozen_model_dir + "/saved_model.pb"
     output_node_names = "predictions/prediction_class"
 
-
+    # freeze graph
     with tf.Session() as sess:
         saver.restore(sess, input_checkpoint)
         # use a built-in TF helper to export variables to constants
@@ -263,20 +262,16 @@ def freeze_graph(args):
             output_node_names.split(",")
         )
 
+    print("{} ops in the frozen graph".format(len(output_graph_def.node)))
+
+    # save model in same format as usual
+    print('saving trained model to {}'.format(args.frozen_model_dir))
     model = fcn8vgg16.FCN8_VGG16(define_graph=False)
     tf.reset_default_graph()
     tf.import_graph_def(output_graph_def, name='')
-    builder = tf.saved_model.builder.SavedModelBuilder(args.frozen_model_dir)
     with tf.Session() as sess:
-        builder.add_meta_graph_and_variables(sess, tags=[model._tag])
-    #builder.add_meta_graph(tags=[model._tag])
-    builder.save()
+        model.save_model(sess, args.frozen_model_dir)
 
-
-    #with tf.gfile.GFile(output_graph_file, "wb") as f:
-    #    f.write(output_graph_def.SerializeToString())
-    #print("frozen graph saved to {}".format(output_graph_file))
-    print("{} ops in the frozen graph".format(len(output_graph_def.node)))
 
 
 if __name__ == '__main__':
