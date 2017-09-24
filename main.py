@@ -10,6 +10,7 @@ import random
 from timeit import default_timer as timer
 
 import tensorflow as tf
+from tensorflow.python.framework import graph_util as tf_graph_util
 from tqdm import tqdm
 import scipy.misc
 import numpy as np
@@ -217,7 +218,10 @@ def predict(args, image_shape):
             predicted_class = model.predict_one(sess, image)
             duration = timer() - start_time
             images_pbar.set_description('Predicting (last tf call {} ms)'.format(int(duration*1000)))
-            # on mac cpu inference is about 670ms on trained but unoptimized graph
+            #    mac cpu inference is  670ms on trained but unoptimized graph. tf 1.3
+            # ubuntu cpu inference is 1360ms on pip tf-gpu 1.3.
+            # ubuntu cpu inference is  560ms on custom built tf-gpu 1.3 (cuda+xla).
+            # ubuntu gpu inference is   18ms on custom built tf-gpu 1.3 (cuda+xla). 580ms total per image. 1.7 fps
 
             for label in range(num_classes):
                 segmentation = np.expand_dims(predicted_class[:,:,label], axis=2)
@@ -229,6 +233,41 @@ def predict(args, image_shape):
             scipy.misc.imsave(os.path.join(output_dir, os.path.basename(image_file)), segmented_image)
 
 
+def freeze_graph(args):
+    # based on https://blog.metaflow.fr/tensorflow-how-to-freeze-a-model-and-serve-it-with-a-python-api-d4f3596b3adc
+    if args.ckpt_dir is None:
+        print("for freezing need --ckpt_dir")
+        return
+    if args.frozen_model_dir is None:
+        print("for freezing need --frozen_model_dir")
+        return
+
+    checkpoint = tf.train.get_checkpoint_state(args.ckpt_dir)
+    input_checkpoint = checkpoint.model_checkpoint_path
+    print("freezing from {}".format(input_checkpoint))
+    saver = tf.train.import_meta_graph(input_checkpoint + '.meta', clear_devices=True)
+    graph = tf.get_default_graph()
+    input_graph_def = graph.as_graph_def()
+    print("%d ops in the input graph." % len(input_graph_def.node))
+
+    output_graph_file = args.frozen_model_dir + "/frozen_model.pb"
+    output_node_names = "predictions/prediction_class"
+
+    with tf.Session() as sess:
+        saver.restore(sess, input_checkpoint)
+
+        # use a built-in TF helper to export variables to constants
+        output_graph_def = tf_graph_util.convert_variables_to_constants(
+            sess,
+            input_graph_def,
+            output_node_names.split(",")
+        )
+
+        with tf.gfile.GFile(output_graph_file, "wb") as f:
+            f.write(output_graph_def.SerializeToString())
+        print("frozen graph saved to {}".format(output_graph_file))
+        print("{} ops in the frozen graph".format(len(output_graph_def.node)))
+
 
 if __name__ == '__main__':
 
@@ -237,7 +276,7 @@ if __name__ == '__main__':
     test_images_path_pattern = '../cityscapes/data/leftImg8bit/test/*/*.png'
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', help='what to do: train/predict', type=str, choices=['train','predict'])
+    parser.add_argument('action', help='what to do: train/predict/freeze', type=str, choices=['train','predict', 'freeze'])
     parser.add_argument('-g', '--gpu', help='number of GPUs to use. default 0 (use CPU)', type=int, default=0)
     parser.add_argument('--gpu_mem', help='GPU memory fraction to use. default 0.9', type=float, default=0.9)
     parser.add_argument('-ep', '--epochs', help='training epochs. default 0', type=int, default=0)
@@ -248,6 +287,7 @@ if __name__ == '__main__':
     parser.add_argument('-cd', '--ckpt_dir', help='training checkpoints directory. default ckpt', type=str, default='ckpt')
     parser.add_argument('-sd', '--summary_dir', help='training tensorboard summaries directory. default summaries', type=str, default='summaries')
     parser.add_argument('-md', '--model_dir', help='model directory. default None - model directory is created in runs. needed for predict', type=str, default=None)
+    parser.add_argument('-fd', '--frozen_model_dir', help='model directory for frozen graph. for freeze', type=str, default=None)
     parser.add_argument('-ip', '--images_paths', help="images path/file pattern. e.g. 'train/img*.png'", type=str, default=None)
     parser.add_argument('-lp', '--labels_paths', help="label images path/file pattern. e.g. 'train/label*.png'", type=str, default=None)
     args = parser.parse_args()
@@ -282,7 +322,9 @@ if __name__ == '__main__':
 
     if args.action=='train':
         train(args, image_shape)
-    else:
+    elif args.action=='predict':
         predict(args, image_shape)
+    elif args.action == 'freeze':
+        freeze_graph(args)
 
-    # TODO: Apply the trained model to a video
+        # TODO: Apply the trained model to a video
