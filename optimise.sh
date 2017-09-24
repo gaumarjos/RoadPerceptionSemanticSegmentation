@@ -1,9 +1,11 @@
 rm -rf optimised_model/*
 mkdir optimised_model
 
+# first parameter $1 frozen_model_dir, second $2 optimised_model_dir
+
 ~/dev/tf/tensorflow-r1.3/bazel-bin/tensorflow/tools/graph_transforms/transform_graph \
---in_graph=frozen_model/saved_model.pb \
---out_graph=optimised_model/saved_model.pb \
+--in_graph=$1/graph.pb \
+--out_graph=$2/graph.pb \
 --inputs=data/images \
 --outputs=predictions/prediction_class \
 --transforms='
