@@ -291,23 +291,24 @@ def optimise_graph(args):
         return
 
     print('calling c++ implementation of graph transform')
-    os.system('./optimise.sh {} {}'.format(args.frozen_model_dir, args.optimised_model_dir))
+    os.system('./optimise.sh {}'.format(args.frozen_model_dir))
 
     # reading optimised graph
     tf.reset_default_graph()
     gd = tf.GraphDef()
-    output_graph_file = args.optimised_model_dir+"/graph.pb"
+    output_graph_file = args.frozen_model_dir+"/optimised_graph.pb"
     with tf.gfile.Open(output_graph_file, 'rb') as f:
         gd.ParseFromString(f.read())
     tf.import_graph_def(gd, name='')
     # save model in same format as usual
+    shutil.rmtree(args.optimised_model_dir)
     print('saving optimised model as saved_model to {}'.format(args.optimised_model_dir))
     model = fcn8vgg16.FCN8_VGG16(define_graph=False)
     tf.reset_default_graph()
     tf.import_graph_def(gd, name='')
     with tf.Session() as sess:
         model.save_model(sess, args.optimised_model_dir)
-
+    shutil.move(args.frozen_model_dir+'/optimised_graph.pb', args.optimised_model_dir)
 
 if __name__ == '__main__':
 
