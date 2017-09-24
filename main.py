@@ -355,7 +355,7 @@ if __name__ == '__main__':
     train_labels_path_pattern = '../cityscapes/data/gtFine/train/*/*_gtFine_labelTrainIds.png'
     test_images_path_pattern = '../cityscapes/data/leftImg8bit/test/*/*.png'
 
-    parse_args()
+    args = parse_args()
 
     if args.images_paths is None:
         if args.action=='train':
