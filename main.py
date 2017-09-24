@@ -267,7 +267,6 @@ def freeze_graph(args):
 
     if os.path.exists(args.frozen_model_dir):
         shutil.rmtree(args.frozen_model_dir)
-    os.makedirs(args.frozen_model_dir)
 
     # save model in same format as usual
     print('saving frozen model as saved_model to {}'.format(args.frozen_model_dir))
