@@ -225,9 +225,12 @@ def predict(args, image_shape):
             start_time = timer()
             predicted_class = model.predict_one(sess, image)
             duration = timer() - start_time
-            total_duration += duration
+            if count>0:
+                total_duration += duration
             count += 1
-            images_pbar.set_description('Predicting (last tf call {} ms, avg {} ms)'.format(int(duration*1000), int(float(total_duration*1000)/count)))
+            time_ms = int(duration*1000)
+            avg_ms = int(float(total_duration*1000)/(count-1 if count>1 else 1))
+            images_pbar.set_description('Predicting (last tf call {} ms, avg {} ms)'.format(time_ms, avg_ms))
             #    mac cpu inference is  670ms on trained but unoptimized graph. tf 1.3
             # ubuntu cpu inference is 1360ms on pip tf-gpu 1.3.
             # ubuntu cpu inference is  560ms on custom built tf-gpu 1.3 (cuda+xla).
