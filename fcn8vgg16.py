@@ -5,7 +5,7 @@ import os
 
 
 class FCN8_VGG16:
-    def __init__(self, images_shape = None, labels_shape = None, define_graph=True):
+    def __init__(self, num_classes = 0, define_graph=True):
         """ initialize network
 
         for training we need to set shapes
@@ -13,8 +13,7 @@ class FCN8_VGG16:
         for inference just set define_graph=False and call load_model straight away. then use predict only
         """
         self._tag = 'FCN8'
-        self._images_shape = images_shape
-        self._labels_shape = labels_shape
+        self._num_classes = num_classes
         if define_graph:
             # create entire model graph
             self._keep_prob = tf.placeholder(tf.float32, name='keep_prob', shape=[])
@@ -165,9 +164,9 @@ class FCN8_VGG16:
     def _create_input_pipeline(self):
         # define input placeholders in the graph
         with tf.name_scope("data"):
-            self._images = tf.placeholder(tf.uint8, name='images', shape=self._images_shape)
+            self._images = tf.placeholder(tf.uint8, name='images', shape=(None, None, None, 3))
             tf.summary.image('input_images', self._images, max_outputs=2)
-            self._labels = tf.placeholder(tf.uint8, name='labels', shape=self._labels_shape)
+            self._labels = tf.placeholder(tf.uint8, name='labels', shape=(None, self._num_classes))
         # zero-mean input
         with tf.name_scope('preprocess') as scope:
             self._images_float = tf.image.convert_image_dtype(self._images, tf.float32)
@@ -398,7 +397,6 @@ class FCN8_VGG16:
             self._parameters += [kernel, biases]
 
     def _create_decoder(self):
-        num_classes = self._labels_shape[-1]
         # with tf.name_scope("decoder"):
         #     with tf.name_scope("1x1"):
         #         kernel = tf.Variable(tf.truncated_normal([1, 1, 4096, num_classes], dtype=tf.float32, stddev=1e-1), name='weights')
@@ -434,7 +432,7 @@ class FCN8_VGG16:
         #         out_shape[3] = channels
         #         self._output = tf.nn.conv2d_transpose(skip3, kernel, output_shape=out_shape, strides=[1,8,8,1], padding='SAME', name='output')
         with tf.name_scope("decoder"):
-            conv_1x1 = tf.layers.conv2d(self._conv7, num_classes, kernel_size=1,
+            conv_1x1 = tf.layers.conv2d(self._conv7, self._num_classes, kernel_size=1,
                                         strides=(1, 1), padding='SAME',
                                         kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
                                         name='conv_1x1')
@@ -449,7 +447,7 @@ class FCN8_VGG16:
                                              kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
                                              name='up3')
             skip3 = tf.add(up3, self._pool3, name='skip3')
-            self._output = tf.layers.conv2d_transpose(skip3, num_classes,
+            self._output = tf.layers.conv2d_transpose(skip3, self._num_classes,
                                              kernel_size=16, strides=8, padding='SAME',
                                              kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3),
                                              name='output')
@@ -460,9 +458,8 @@ class FCN8_VGG16:
             self._logits = tf.identity(self._output, name='logits')
             self._prediction_softmax = tf.nn.softmax(self._logits, name="prediction_softmax")
             self._prediction_class = tf.cast(tf.greater(self._prediction_softmax, 0.5), dtype=tf.float32, name='prediction_class')
-            num_classes = self._labels_shape[-1]
             self._prediction_class_idx = tf.cast(tf.argmax(self._prediction_class, axis=3), dtype=tf.uint8, name='prediction_class_idx')
-            tf.summary.image('prediction_class_idx', tf.expand_dims(tf.div(tf.cast(self._prediction_class_idx, dtype=tf.float32), float(num_classes)), -1), max_outputs=2)
+            tf.summary.image('prediction_class_idx', tf.expand_dims(tf.div(tf.cast(self._prediction_class_idx, dtype=tf.float32), float(self._num_classes)), -1), max_outputs=2)
         with tf.name_scope("iou"):
             mul = tf.multiply(self._prediction_class, self._labels_float)
             inter = tf.reduce_sum(mul, axis=[1,2], name='intersection')

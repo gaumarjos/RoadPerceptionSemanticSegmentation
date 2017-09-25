@@ -116,10 +116,8 @@ def train(args, image_shape):
 
     with tf.Session(config=config) as sess:
         # define our FCN
-        images_shape = (None,)+image_shape+(3,)
         num_classes = len(cityscape_labels.labels)
-        labels_shape = (None,)+image_shape+(num_classes,)
-        model = fcn8vgg16.FCN8_VGG16(images_shape, labels_shape)
+        model = fcn8vgg16.FCN8_VGG16(num_classes)
 
         # variables initialization
         sess.run(tf.global_variables_initializer())
@@ -255,6 +253,7 @@ def predict_files(args, image_shape):
             # ubuntu cpu inference is  560ms on custom built tf-gpu 1.3 (cuda+xla).
             # ubuntu gpu inference is   18ms on custom built tf-gpu 1.3 (cuda+xla). 580ms total per image. 1.7 fps
             # quantize_weights increases inference to 50ms
+            # final performance on ubuntu/1080ti with ssd, including time to load/save is 3 fps
 
             scipy.misc.imsave(os.path.join(output_dir, os.path.basename(image_file)), segmented_image)
 
@@ -338,7 +337,7 @@ def optimise_graph(args):
     shutil.move(args.frozen_model_dir+'/optimised_graph.pb', args.optimised_model_dir)
 
 
-def predict_video(args, image_shape):
+def predict_video(args):
     if args.video_file_in is None:
         print("for video processing need --video_file_in")
         return
@@ -348,8 +347,6 @@ def predict_video(args, image_shape):
 
     def process_frame(image):
         # this function expects color images
-        # try to get rid of resizing later (need to change network shapes)
-        image = scipy.misc.imresize(image, image_shape)
         segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
         return segmented_image
 
@@ -362,6 +359,8 @@ def predict_video(args, image_shape):
         input_clip = VideoFileClip(args.video_file_in)
         annotated_clip = input_clip.fl_image(process_frame)
         annotated_clip.write_videofile(args.video_file_out, audio=False)
+        # results on ubuntu/1080ti. with GPU 4.8fps. with CPU the same??
+        # mac cpu
 
 
 
