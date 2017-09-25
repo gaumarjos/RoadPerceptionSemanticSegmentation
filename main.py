@@ -239,7 +239,7 @@ def predict(args, image_shape):
 
         num_classes = len(cityscape_labels.labels)
         colors = {}
-        transparency_level = 56
+        transparency_level = 128
         for label in range(num_classes):
             color = cityscape_labels.trainId2label[label].color
             colors[label] = np.array([color + (transparency_level,)], dtype=np.uint8)
