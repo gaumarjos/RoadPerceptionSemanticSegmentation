@@ -173,6 +173,30 @@ def train(args, image_shape):
         model.save_model(sess, model_dir)
 
 
+def predict_image(sess, model, image, colors_dict):
+    # run TF prediction
+    start_time = timer()
+    predicted_class = model.predict_one(sess, image)
+    predicted_class = np.array(predicted_class, dtype=np.uint8)
+    duration = timer() - start_time
+    tf_time_ms = int(duration * 1000)
+
+    # overlay on image
+    start_time = timer()
+    result_im = scipy.misc.toimage(image)
+    for label in range(len(colors_dict)):
+        segmentation = np.expand_dims(predicted_class[:, :, label], axis=2)
+        mask = np.dot(segmentation, colors_dict[label])
+        mask = scipy.misc.toimage(mask, mode="RGBA")
+        # paste (from PIL) seem to take time (or rather toimage calls to convert to PIL format).
+        # in the future need to try this to speed up
+        # https://stackoverflow.com/questions/19561597/pil-image-paste-on-another-image-with-alpha
+        result_im.paste(mask, box=None, mask=mask)
+    segmented_image = np.array(result_im)
+    duration = timer() - start_time
+    img_time_ms = int(duration * 1000)
+
+    return segmented_image, tf_time_ms, img_time_ms
 
 def predict(args, image_shape):
     # tensorflow GPU config
@@ -214,8 +238,8 @@ def predict(args, image_shape):
         print('Predicting on test images {} to: {}'.format(args.images_paths, output_dir))
 
         num_classes = len(cityscape_labels.labels)
-        transparency_level = 56
         colors = {}
+        transparency_level = 56
         for label in range(num_classes):
             color = cityscape_labels.trainId2label[label].color
             colors[label] = np.array([color + (transparency_level,)], dtype=np.uint8)
@@ -229,32 +253,18 @@ def predict(args, image_shape):
         img_count = 0.
         for image_file in images_pbar:
             image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
-            result_im = scipy.misc.toimage(image)
 
-            start_time = timer()
-            predicted_class = model.predict_one(sess, image)
-            predicted_class = np.array(predicted_class, dtype=np.uint8)
-            duration = timer() - start_time
+            segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
+
             if tf_count>0:
-                tf_total_duration += duration
+                tf_total_duration += tf_time_ms
             tf_count += 1
-            tf_time_ms = int(duration*1000)
-            tf_avg_ms = int(float(tf_total_duration*1000)/(tf_count-1 if tf_count>1 else 1))
+            tf_avg_ms = int(tf_total_duration/(tf_count-1 if tf_count>1 else 1))
 
-            start_time = timer()
-            for label in range(num_classes):
-                segmentation = np.expand_dims(predicted_class[:,:,label], axis=2)
-                color = colors[label]
-                mask = np.dot(segmentation, color)
-                mask = scipy.misc.toimage(mask, mode="RGBA")
-                result_im.paste(mask, box=None, mask=mask)
-            segmented_image = np.array(result_im)
-            duration = timer() - start_time
-            if tf_count>0:
-                img_total_duration += duration
+            if img_count>0:
+                img_total_duration += img_time_ms
             img_count += 1
-            img_time_ms = int(duration*1000)
-            img_avg_ms = int(float(img_total_duration*1000)/(img_count-1 if img_count>1 else 1))
+            img_avg_ms = int(img_total_duration/(img_count-1 if img_count>1 else 1))
 
             images_pbar.set_description('Predicting (last tf call {} ms, avg tf {} ms, last img {} ms, avg {} ms)'.format(
                 tf_time_ms, tf_avg_ms, img_time_ms, img_avg_ms))
