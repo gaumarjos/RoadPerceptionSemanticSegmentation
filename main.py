@@ -9,6 +9,7 @@ import glob
 import re
 import random
 from timeit import default_timer as timer
+import math
 
 import tensorflow as tf
 from tensorflow.python.framework import graph_util as tf_graph_util
@@ -169,9 +170,19 @@ def train(args, image_shape):
 
 
 def predict_image(sess, model, image, colors_dict):
+    # this image size is arbitrary and may break middle of decoder in the network.
+    # need to feed FCN images sizes in multiples of 32
+    image_shape = [x for x in image.shape]
+    fcn_shape = [x for x in image.shape]
+    # should be bigger and multiple of 32 for fcn to work
+    fcn_shape[0] = math.ceil(fcn_shape[0] / 32) * 32
+    fcn_shape[1] = math.ceil(fcn_shape[1] / 32) * 32
+    tmp_image = np.zeros(fcn_shape, dtype=np.uint8)
+    tmp_image[0:image_shape[0], 0:image_shape[1], :] = image
+
     # run TF prediction
     start_time = timer()
-    predicted_class = model.predict_one(sess, image)
+    predicted_class = model.predict_one(sess, tmp_image)
     predicted_class = np.array(predicted_class, dtype=np.uint8)
     duration = timer() - start_time
     tf_time_ms = int(duration * 1000)
@@ -191,7 +202,9 @@ def predict_image(sess, model, image, colors_dict):
     duration = timer() - start_time
     img_time_ms = int(duration * 1000)
 
-    return segmented_image, tf_time_ms, img_time_ms
+    out = segmented_image[0:image_shape[0], 0:image_shape[1], :]
+
+    return out, tf_time_ms, img_time_ms
 
 def session_config(args):
     # tensorflow GPU config
@@ -346,7 +359,6 @@ def predict_video(args):
         return
 
     def process_frame(image):
-        # this function expects color images
         segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
         return segmented_image
 
@@ -359,7 +371,7 @@ def predict_video(args):
         input_clip = VideoFileClip(args.video_file_in)
         annotated_clip = input_clip.fl_image(process_frame)
         annotated_clip.write_videofile(args.video_file_out, audio=False)
-        # results on ubuntu/1080ti. with GPU 4.8fps. with CPU the same??
+        # results on ubuntu/1080ti. with GPU 4.8fps. with CPU the same?? for 512x256 size
         # mac cpu
 
 
@@ -439,8 +451,6 @@ if __name__ == '__main__':
     import imageio
     imageio.plugins.ffmpeg.download()
 
-    # this is image size to be read and trained on. predict also uses this
-    image_shape = (256, 512)
 
     print("action={}".format(args.action))
     print("gpu={}".format(args.gpu))
@@ -450,9 +460,13 @@ if __name__ == '__main__':
         print('batch_size={}'.format(args.batch_size))
         print('epochs={}'.format(args.epochs))
         print('learning_rate={}'.format(args.learning_rate))
+        # this is image size to be read and trained on. predict also uses this
+        # cityscapes size is 2048x1024. looks like the ratio should stay or decoder fails
+        image_shape = (256, 512)
         train(args, image_shape)
     elif args.action=='predict':
         print('images_paths={}'.format(args.images_paths))
+        image_shape = (256, 512)
         predict_files(args, image_shape)
     elif args.action == 'freeze':
         freeze_graph(args)
