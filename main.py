@@ -107,10 +107,7 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
 
 
 def train(args, image_shape):
-    # tensorflow GPU config
-    config = tf.ConfigProto(log_device_placement=False, device_count = {'GPU': args.gpu})
-    config.gpu_options.allow_growth = True
-    config.gpu_options.per_process_gpu_memory_fraction = args.gpu_mem
+    config = session_config(args)
 
     # extract pre-trained VGG weights
     with tf.Session(config=config) as sess:
@@ -198,7 +195,7 @@ def predict_image(sess, model, image, colors_dict):
 
     return segmented_image, tf_time_ms, img_time_ms
 
-def predict(args, image_shape):
+def session_config(args):
     # tensorflow GPU config
     config = tf.ConfigProto(log_device_placement=False, device_count = {'GPU': args.gpu})
     config.gpu_options.allow_growth = True
@@ -211,23 +208,12 @@ def predict(args, image_shape):
             jit_level = tf.OptimizerOptions.ON_2
         config.graph_options.optimizer_options.global_jit_level = jit_level
 
-    tf.reset_default_graph()
 
-    with tf.Session(config=config) as sess:
-        # define our FCN
-        #images_shape = (None,)+image_shape+(3,)
-        #labels_shape = (None,)+image_shape+(num_classes,)
-
-        #model = fcn8vgg16.FCN8_VGG16(images_shape, labels_shape, define_graph=False)
+def predict_files(args, image_shape):
+    with tf.Session(config=session_config(args)) as sess:
+        tf.reset_default_graph()
         model = fcn8vgg16.FCN8_VGG16(define_graph=False)
-
-        # load saved model
-        if args.model_dir is None:
-            model_dir = 'trained_model'
-        else:
-            model_dir = args.model_dir
-
-        model.load_model(sess, model_dir)
+        model.load_model(sess, 'trained_model' if args.model_dir is None else args.model_dir)
 
         # Make folder for current run
         output_dir = os.path.join(args.runs_dir, time.strftime("%Y%m%d_%H%M%S"))
@@ -237,12 +223,7 @@ def predict(args, image_shape):
 
         print('Predicting on test images {} to: {}'.format(args.images_paths, output_dir))
 
-        num_classes = len(cityscape_labels.labels)
-        colors = {}
-        transparency_level = 128
-        for label in range(num_classes):
-            color = cityscape_labels.trainId2label[label].color
-            colors[label] = np.array([color + (transparency_level,)], dtype=np.uint8)
+        colors = get_colors()
 
         images_pbar = tqdm(glob.glob(args.images_paths),
                             desc='Predicting (last tf call __ ms)',
@@ -268,6 +249,7 @@ def predict(args, image_shape):
 
             images_pbar.set_description('Predicting (last tf call {} ms, avg tf {} ms, last img {} ms, avg {} ms)'.format(
                 tf_time_ms, tf_avg_ms, img_time_ms, img_avg_ms))
+            # tf timings:
             #    mac cpu inference is  670ms on trained but unoptimized graph. tf 1.3
             # ubuntu cpu inference is 1360ms on pip tf-gpu 1.3.
             # ubuntu cpu inference is  560ms on custom built tf-gpu 1.3 (cuda+xla).
@@ -356,7 +338,7 @@ def optimise_graph(args):
     shutil.move(args.frozen_model_dir+'/optimised_graph.pb', args.optimised_model_dir)
 
 
-def predict_video(args):
+def predict_video(args, image_shape):
     if args.video_file_in is None:
         print("for video processing need --video_file_in")
         return
@@ -366,11 +348,31 @@ def predict_video(args):
 
     def process_frame(image):
         # this function expects color images
-        return image
+        # try to get rid of resizing later (need to change network shapes)
+        image = scipy.misc.imresize(image, image_shape)
+        segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
+        return segmented_image
 
-    input_clip = VideoFileClip(args.video_file_in)
-    annotated_clip = input_clip.fl_image(process_frame)
-    annotated_clip.write_videofile(args.video_file_out, audio=False)
+    tf.reset_default_graph()
+    with tf.Session(config=session_config(args)) as sess:
+        model = fcn8vgg16.FCN8_VGG16(define_graph=False)
+        model.load_model(sess, 'trained_model' if args.model_dir is None else args.model_dir)
+        print('Running on video {}, output to: {}'.format(args.video_file_in, args.video_file_out))
+        colors = get_colors()
+        input_clip = VideoFileClip(args.video_file_in)
+        annotated_clip = input_clip.fl_image(process_frame)
+        annotated_clip.write_videofile(args.video_file_out, audio=False)
+
+
+
+def get_colors():
+    num_classes = len(cityscape_labels.labels)
+    colors = {}
+    transparency_level = 128
+    for label in range(num_classes):
+        color = cityscape_labels.trainId2label[label].color
+        colors[label] = np.array([color + (transparency_level,)], dtype=np.uint8)
+    return colors
 
 
 def check_tf():
@@ -449,10 +451,10 @@ if __name__ == '__main__':
         train(args, image_shape)
     elif args.action=='predict':
         print('images_paths={}'.format(args.images_paths))
-        predict(args, image_shape)
+        predict_files(args, image_shape)
     elif args.action == 'freeze':
         freeze_graph(args)
     elif args.action == 'optimise':
         optimise_graph(args)
     elif args.action == 'video':
-        predict_video(args)
+        predict_video(args, image_shape)
