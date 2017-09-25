@@ -210,8 +210,8 @@ def session_config(args):
 
 
 def predict_files(args, image_shape):
+    tf.reset_default_graph()
     with tf.Session(config=session_config(args)) as sess:
-        tf.reset_default_graph()
         model = fcn8vgg16.FCN8_VGG16(define_graph=False)
         model.load_model(sess, 'trained_model' if args.model_dir is None else args.model_dir)
 
