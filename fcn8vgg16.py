@@ -166,7 +166,7 @@ class FCN8_VGG16:
         with tf.name_scope("data"):
             self._images = tf.placeholder(tf.uint8, name='images', shape=(None, None, None, 3))
             tf.summary.image('input_images', self._images, max_outputs=2)
-            self._labels = tf.placeholder(tf.uint8, name='labels', shape=(None, self._num_classes))
+            self._labels = tf.placeholder(tf.uint8, name='labels', shape=(None, None, None, self._num_classes))
         # zero-mean input
         with tf.name_scope('preprocess') as scope:
             self._images_float = tf.image.convert_image_dtype(self._images, tf.float32)
