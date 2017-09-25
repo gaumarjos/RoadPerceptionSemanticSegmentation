@@ -26,8 +26,10 @@ def maybe_download_pretrained_vgg(data_dir):
     Download and extract pretrained vgg model if it doesn't exist
     :param data_dir: Directory to download the model to
     """
-    vgg_filename = 'vgg.zip'
     vgg_path = data_dir
+    if not os.path.exists(vgg_path):
+        os.makedirs(vgg_path)
+    vgg_filename = os.path.join(vgg_path, 'vgg.zip')
     vgg_files = [
         os.path.join(vgg_path, 'variables/variables.data-00000-of-00001'),
         os.path.join(vgg_path, 'variables/variables.index'),
@@ -44,17 +46,17 @@ def maybe_download_pretrained_vgg(data_dir):
         with DLProgress(unit='B', unit_scale=True, miniters=1) as pbar:
             urlretrieve(
                 'https://s3-us-west-1.amazonaws.com/udacity-selfdrivingcar/vgg.zip',
-                os.path.join(vgg_path, vgg_filename),
+                vgg_filename,
                 pbar.hook)
 
         # Extract vgg
         print('Extracting model...')
-        zip_ref = zipfile.ZipFile(os.path.join(vgg_path, vgg_filename), 'r')
-        zip_ref.extractall(data_dir)
+        zip_ref = zipfile.ZipFile(vgg_filename, 'r')
+        zip_ref.extractall(vgg_path)
         zip_ref.close()
 
         # Remove zip file to save space
-        os.remove(os.path.join(vgg_path, vgg_filename))
+        os.remove(vgg_filename)
 
 
 
