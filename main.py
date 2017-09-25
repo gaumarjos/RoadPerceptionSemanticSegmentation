@@ -15,6 +15,7 @@ from tensorflow.python.framework import graph_util as tf_graph_util
 from tqdm import tqdm
 import scipy.misc
 import numpy as np
+from moviepy.editor import VideoFileClip
 
 import helper
 import cityscape_labels
@@ -214,38 +215,55 @@ def predict(args, image_shape):
 
         num_classes = len(cityscape_labels.labels)
         transparency_level = 56
+        colors = {}
+        for label in range(num_classes):
+            color = cityscape_labels.trainId2label[label].color
+            colors[label] = np.array([color + (transparency_level,)], dtype=np.uint8)
 
         images_pbar = tqdm(glob.glob(args.images_paths),
                             desc='Predicting (last tf call __ ms)',
                             unit='images')
-        total_duration = 0.
-        count = 0.
+        tf_total_duration = 0.
+        img_total_duration = 0.
+        tf_count = 0.
+        img_count = 0.
         for image_file in images_pbar:
             image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
             result_im = scipy.misc.toimage(image)
 
             start_time = timer()
             predicted_class = model.predict_one(sess, image)
+            predicted_class = np.array(predicted_class, dtype=np.uint8)
             duration = timer() - start_time
-            if count>0:
-                total_duration += duration
-            count += 1
-            time_ms = int(duration*1000)
-            avg_ms = int(float(total_duration*1000)/(count-1 if count>1 else 1))
-            images_pbar.set_description('Predicting (last tf call {} ms, avg {} ms)'.format(time_ms, avg_ms))
+            if tf_count>0:
+                tf_total_duration += duration
+            tf_count += 1
+            tf_time_ms = int(duration*1000)
+            tf_avg_ms = int(float(tf_total_duration*1000)/(tf_count-1 if tf_count>1 else 1))
+
+            start_time = timer()
+            for label in range(num_classes):
+                segmentation = np.expand_dims(predicted_class[:,:,label], axis=2)
+                color = colors[label]
+                mask = np.dot(segmentation, color)
+                mask = scipy.misc.toimage(mask, mode="RGBA")
+                result_im.paste(mask, box=None, mask=mask)
+            segmented_image = np.array(result_im)
+            duration = timer() - start_time
+            if tf_count>0:
+                img_total_duration += duration
+            img_count += 1
+            img_time_ms = int(duration*1000)
+            img_avg_ms = int(float(img_total_duration*1000)/(img_count-1 if img_count>1 else 1))
+
+            images_pbar.set_description('Predicting (last tf call {} ms, avg tf {} ms, last img {} ms, avg {} ms)'.format(
+                tf_time_ms, tf_avg_ms, img_time_ms, img_avg_ms))
             #    mac cpu inference is  670ms on trained but unoptimized graph. tf 1.3
             # ubuntu cpu inference is 1360ms on pip tf-gpu 1.3.
             # ubuntu cpu inference is  560ms on custom built tf-gpu 1.3 (cuda+xla).
             # ubuntu gpu inference is   18ms on custom built tf-gpu 1.3 (cuda+xla). 580ms total per image. 1.7 fps
             # quantize_weights increases inference to 50ms
 
-            for label in range(num_classes):
-                segmentation = np.expand_dims(predicted_class[:,:,label], axis=2)
-                color = cityscape_labels.trainId2label[label].color
-                mask = np.dot(segmentation, np.array([color + (transparency_level,)]))
-                mask = scipy.misc.toimage(mask, mode="RGBA")
-                result_im.paste(mask, box=None, mask=mask)
-            segmented_image = np.array(result_im)
             scipy.misc.imsave(os.path.join(output_dir, os.path.basename(image_file)), segmented_image)
 
 
@@ -328,6 +346,23 @@ def optimise_graph(args):
     shutil.move(args.frozen_model_dir+'/optimised_graph.pb', args.optimised_model_dir)
 
 
+def predict_video(args):
+    if args.video_file_in is None:
+        print("for video processing need --video_file_in")
+        return
+    if args.video_file_out is None:
+        print("for video processing need --video_file_out")
+        return
+
+    def process_frame(image):
+        # this function expects color images
+        return image
+
+    input_clip = VideoFileClip(args.video_file_in)
+    annotated_clip = input_clip.fl_image(process_frame)
+    annotated_clip.write_videofile(args.video_file_out, audio=False)
+
+
 def check_tf():
     # Check TensorFlow Version
     assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
@@ -345,7 +380,10 @@ def check_tf():
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('action', help='what to do: train/predict/freeze/optimise', type=str, choices=['train','predict', 'freeze', 'optimise'])
+    parser.add_argument('action',
+                        help='what to do: train/predict/freeze/optimise/video',
+                        type=str,
+                        choices=['train','predict', 'freeze', 'optimise', 'video'])
     parser.add_argument('-g', '--gpu', help='number of GPUs to use. default 0 (use CPU)', type=int, default=0)
     parser.add_argument('-gm','--gpu_mem', help='GPU memory fraction to use. default 0.9', type=float, default=0.9)
     parser.add_argument('-x','--xla', help='XLA JIT level. default None', type=int, default=None, choices=[1,2])
@@ -361,6 +399,8 @@ def parse_args():
     parser.add_argument('-od', '--optimised_model_dir', help='model directory for optimised graph. for optimize', type=str, default=None)
     parser.add_argument('-ip', '--images_paths', help="images path/file pattern. e.g. 'train/img*.png'", type=str, default=None)
     parser.add_argument('-lp', '--labels_paths', help="label images path/file pattern. e.g. 'train/label*.png'", type=str, default=None)
+    parser.add_argument('-vi', '--video_file_in', help="mp4 video file to process", type=str, default=None)
+    parser.add_argument('-vo', '--video_file_out', help="mp4 video file to save results", type=str, default=None)
     args = parser.parse_args()
     return args
 
@@ -404,5 +444,5 @@ if __name__ == '__main__':
         freeze_graph(args)
     elif args.action == 'optimise':
         optimise_graph(args)
-
-        # TODO: Apply the trained model to a video
+    elif args.action == 'video':
+        predict_video(args)
