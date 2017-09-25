@@ -459,4 +459,4 @@ if __name__ == '__main__':
     elif args.action == 'optimise':
         optimise_graph(args)
     elif args.action == 'video':
-        predict_video(args, image_shape)
+        predict_video(args)
