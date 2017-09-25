@@ -436,6 +436,9 @@ if __name__ == '__main__':
         args.labels_paths = train_labels_path_pattern
 
     check_tf()
+    # fix plugin for moviepy
+    import imageio
+    imageio.plugins.ffmpeg.download()
 
     # this is image size to be read and trained on. predict also uses this
     image_shape = (256, 512)
