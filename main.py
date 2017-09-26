@@ -38,7 +38,7 @@ def load_trained_vgg_vars(sess):
     :return: dict name/value where value is pre-trained array
     """
     # Download pretrained vgg model
-    vgg_path = 'pretrained_vgg'
+    vgg_path = 'pretrained_vgg/vgg'
     helper.maybe_download_pretrained_vgg(vgg_path)
     # load model
     vgg_tag = 'vgg16'
