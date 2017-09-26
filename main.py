@@ -343,7 +343,6 @@ def optimise_graph(args):
     shutil.rmtree(args.optimised_model_dir, ignore_errors=True)
     if not os.path.exists(args.optimised_model_dir):
         os.makedirs(args.optimised_model_dir)
-    else:
 
     print('saving optimised model as saved_model to {}'.format(args.optimised_model_dir))
     model = fcn8vgg16.FCN8_VGG16(define_graph=False)
