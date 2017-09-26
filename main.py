@@ -374,9 +374,12 @@ def predict_video(args):
         input_clip = VideoFileClip(args.video_file_in)
         annotated_clip = input_clip.fl_image(process_frame)
         annotated_clip.write_videofile(args.video_file_out, audio=False)
-        # results on ubuntu/1080ti. with GPU 4.8fps. with CPU the same?? for 512x256 size
-        # on same ubuntu/gpu for full size 1280x720 it takes 1.2s/frame i.e. 0.8fps :(
-        # mac cpu takes 6.5sec/frame on full size video
+        # for 512x256 size
+        # ubuntu/1080ti. with GPU 4.8fps. with CPU the same??
+        # full size 1440x720
+        # ubuntu/gpu 1.2s/frame i.e. 0.8fps :(
+        # ubuntu/cpu 1.2fps
+        # mac cpu 6.5sec/frame
 
 
 
