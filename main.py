@@ -340,9 +340,11 @@ def optimise_graph(args):
     print("{} ops in the optimised graph".format(len(gd.node)))
 
     # save model in same format as usual
-    shutil.rmtree(args.optimised_model_dir)
+    shutil.rmtree(args.optimised_model_dir, ignore_errors=True)
     if not os.path.exists(args.optimised_model_dir):
         os.makedirs(args.optimised_model_dir)
+    else:
+
     print('saving optimised model as saved_model to {}'.format(args.optimised_model_dir))
     model = fcn8vgg16.FCN8_VGG16(define_graph=False)
     tf.reset_default_graph()
