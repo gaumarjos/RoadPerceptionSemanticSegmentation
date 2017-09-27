@@ -117,16 +117,90 @@ to fully utilise your hardware capabilities.
 In this work we used tensorflow 1.3
 
 
+
 ## Implementation Notes
+
 [fcn8vgg16.py](fcn8vgg16.py) is the definition of network architecture (as per paper above).
 It is using [VGG16](https://arxiv.org/abs/1409.1556) architecture for encoder part of the network.
 We use pre-trained VGG16 weights provided by Udacity for initialization before training.
 The download happens automatically first time you run training.
 
+[main.py](main.py) is the driving script. It takes most of the inputs from command
+line arguments.
+
+
 ## How to Run
-Run the following command to run the project:
+
+If run without arguments the `main.py` lists the list of options it takes:
 ```
-python main.py
+$ python main.py
+usage: main.py [-h] [-g GPU] [-gm GPU_MEM] [-x {1,2}] [-ep EPOCHS]
+               [-bs BATCH_SIZE] [-lr LEARNING_RATE] [-kp KEEP_PROB]
+               [-rd RUNS_DIR] [-cd CKPT_DIR] [-sd SUMMARY_DIR] [-md MODEL_DIR]
+               [-fd FROZEN_MODEL_DIR] [-od OPTIMISED_MODEL_DIR]
+               [-ip IMAGES_PATHS] [-lp LABELS_PATHS] [-vi VIDEO_FILE_IN]
+               [-vo VIDEO_FILE_OUT]
+               {train,predict,freeze,optimise,video}
+```
+
+`--gpu=1` enables use of GPU for training/inference (0 is for CPU-only run)
+
+`--xla=level` enables use of [XLA](https://www.tensorflow.org/performance/xla/)
+
+`--epochs=10` sets the number of training epochs
+
+`--batch_size=5` sets the training mini-batch size. For FCNs every pixel of the
+image is classified, so empirically batch size should be relatively small. We
+experimented with batch sizes between 5 and 10. Also be mindful of the size of the
+network -- you may need at least 8Gb+ of GPU memory to run the training.
+
+`--learning_rate=0.0001` sets the training learning rate
+
+Provided scripts `nn_xxxxx.sh` demonstrate how to call `main.py` for all possible actions, which we detail below.
+
+
+### Training
+
+To train the network (includes download of pre-trained VGG16) run:
+
+```
+python main.py train --gpu=1 --xla=2 -ep=10 -bs=10 -lr=0.00001
+```
+
+Here is an example of its output:
+```
+2017-09-27 09:11:22.365928: I tensorflow/stream_executor/cuda/cuda_gpu_executor.cc:893] successful NUMA node read from SysFS had negative value (-1), but there must be at least one NUMA node, so returning NUMA node zero
+2017-09-27 09:11:22.366200: I tensorflow/core/common_runtime/gpu/gpu_device.cc:955] Found device 0 with properties:
+name: GeForce GTX 1080 Ti
+major: 6 minor: 1 memoryClockRate (GHz) 1.582
+pciBusID 0000:01:00.0
+Total memory: 10.91GiB
+Free memory: 10.40GiB
+2017-09-27 09:11:22.366213: I tensorflow/core/common_runtime/gpu/gpu_device.cc:976] DMA: 0
+2017-09-27 09:11:22.366217: I tensorflow/core/common_runtime/gpu/gpu_device.cc:986] 0:   Y
+2017-09-27 09:11:22.366223: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1045] Creating TensorFlow device (/gpu:0) -> (device: 0, name: GeForce GTX 1080 Ti, pci bus id: 0000:01:00.0)
+2017-09-27 09:11:22.413727: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1045] Creating TensorFlow device (/gpu:0) -> (device: 0, name: GeForce GTX 1080 Ti, pci bus id: 0000:01:00.0)
+2017-09-27 09:11:22.414399: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1045] Creating TensorFlow device (/gpu:0) -> (device: 0, name: GeForce GTX 1080 Ti, pci bus id: 0000:01:00.0)
+INFO:tensorflow:Restoring parameters from b'pretrained_vgg/vgg/variables/variables'
+2017-09-27 09:11:29.055226: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1045] Creating TensorFlow device (/gpu:0) -> (device: 0, name: GeForce GTX 1080 Ti, pci bus id: 0000:01:00.0)
+INFO:tensorflow:Restoring parameters from ckpt/fcn8vgg16-26810
+Train Epoch  1/10 (loss 0.195):   1%|          | 7/595 [00:13<18:20,  1.87s/batches]
+...
+INFO:tensorflow:No assets to save.
+INFO:tensorflow:No assets to write.
+INFO:tensorflow:SavedModel written to: b'runs/20170927_091136/model/saved_model.pb'
+TensorFlow Version: 1.3.0
+Default GPU Device: /gpu:0
+action=train
+gpu=1
+keep_prob=0.9
+images_paths=../cityscapes/data/leftImg8bit/train/*/*_leftImg8bit.png
+batch_size=5
+epochs=10
+learning_rate=1e-05
+restored from checkpoint ckpt/fcn8vgg16-26810
+continuing training after 26810 steps done previously
+saving trained model to runs/20170927_091136/model
 ```
 
 
