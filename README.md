@@ -244,7 +244,7 @@ to see what is going on):
 
 ![training input/output visualisation](imgs/tensorboard_images.png)
 
-Finally we can expect the calculation graph:
+Finally we can inspect the calculation graph:
 
 ![FCN calculation graph](imgs/tensorboard_graph.png)
 
@@ -311,6 +311,25 @@ Here is an example of input test image and resulting segmented output
 ![results of segmentation superimposed on original image](imgs/test_segmented.png)
 
 We see that it correctly identifies pedestrians, road, traffic lights, road signs, bicycles etc.
+
+### Inference on Video
+
+Finally we test the results on video sequences. With 512x256 image size we
+can achieve 5 frames per second performance on GPU.
+
+```
+python main.py video --gpu=1 --xla=2 --model_dir=optimised_model --video_file_in=stuttgart02.mp4 --video_file_out=stuttgart02_segmented.mp4
+```
+
+will show output like this:
+
+```
+Running on video stuttgart02.mp4, output to: stuttgart02_segmented.mp4
+[MoviePy] >>>> Building video stuttgart02_segmented.mp4
+[MoviePy] Writing video stuttgart02_segmented.mp4
+ 65%|█████████████████████████████████████████████████████████████████▎                                   | 777/1201 [02:34<01:24,  5.04it/s
+```
+
 
 
 ## TODO
