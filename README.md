@@ -203,6 +203,22 @@ continuing training after 26810 steps done previously
 saving trained model to runs/20170927_091136/model
 ```
 
+The checkpoints are saved to `--ckpt_dir` which defaults to `ckpt`
+
+The summaries are saved to `--summaries_dir` which defaults to `summaries`
+You can see training visually by starting [tensorboard](https://www.tensorflow.org/get_started/summaries_and_tensorboard)
+
+```
+$ tensorboard --logdir summaries --host 0.0.0.0 --port 8080
+```
+
+If you then open tensorboard address `http://192.168.0.1:8080/` you will see
+the graph visualisation and training statistics like the following (this is
+the view after 90 training epochs in 6 runs):
+
+![training visualisation](imgs/tensorboard_training.png)
+
+
 
 ## TODO
 * look at ways to avoid `map_fn` for image normalisation in tensorflow graph.
