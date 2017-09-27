@@ -212,15 +212,33 @@ You can see training visually by starting [tensorboard](https://www.tensorflow.o
 $ tensorboard --logdir summaries --host 0.0.0.0 --port 8080
 ```
 
-If you then open tensorboard address `http://192.168.0.1:8080/` you will see
-the graph visualisation and training statistics like the following (this is
-the view after 90 training epochs in 6 runs):
+If you then open tensorboard address `http://192.168.0.1:8080/` in your web browser
+you will see
+the graph visualisation and training statistics like the following:
 
 ![training visualisation](imgs/tensorboard_training.png)
 
+Here we trained for 90 epochs in 6 runs, first run was for 25 epochs with learning
+rate of 0.0001. Second run has same learning rate, which was too high as we see
+volatility in convergence. For remaining runs we used learning rate of 0.00001.
+
+We also measured mean [Intersection over Union, IoU](https://en.wikipedia.org/wiki/Jaccard_index)
+metric. On average, across all 35 classes, it is about 40%.
+But it is not weighted. Classes in Cityscapes dataset are not balanced.
+For example there are much less traffic signs pixels than that of road surface or
+sky. One way to improve accuracy (and training convergence) is to weigh
+both loss (we use standard mean cross entropy loss) and IoU with weights
+inversely proportional to how classes are represented.
+
+Tensorboard also allows to see the input images alongside with visualised
+class predictions (here we rescale pixel intensities to 0..255 so it is easier
+to see what is going on):
+
+![training visualisation](imgs/tensorboard_images.png)
 
 
 ## TODO
 * look at ways to avoid `map_fn` for image normalisation in tensorflow graph.
-it breaks optimised graph
-
+it breaks optimised graph if we want to use `remove_nodes(op=Identity, op=CheckNumerics)`
+and `quantize_nodes` optimization
+* use weighted loss and IoU in inverse proportion to number class examples
