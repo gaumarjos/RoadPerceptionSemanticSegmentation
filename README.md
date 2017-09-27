@@ -240,8 +240,42 @@ to see what is going on):
 ![training input/output visualisation](imgs/tensorboard_images.png)
 
 
+### Freezing Variables
+
+We can use the trained network saved in `runs/*/model` or we can run a few
+[optimisations for subsequent inference](https://www.tensorflow.org/performance/performance_guide)
+
+First optimization we can do after training is freezing network weights
+by converting Variable nodes to constants
+
+```
+python main.py freeze --ckpt_dir=ckpt --frozen_model_dir=frozen_model
+```
+
+in our case we have 1861 ops in the input graph and 306 ops in the frozen graph.
+In total 38 variables are converted and all the nodes related to training
+are pruned. Saved network size falls from 568mb to 293mb.
+
+
+### Optimizing for Inference
+
+We can further optimize the resulting graph using tensorflow tools.
+One such transformation is
+[weights quantization](https://www.tensorflow.org/performance/quantization)
+We run this (and some other transformations) as follows:
+
+```
+python main.py optimise --frozen_model_dir=frozen_model --optimised_model_dir=optimised_model
+```
+
+This increases number of operations to 369 (to convert between quantised and
+normal quantities) but decreases network size to 73mb.
+
+
+
+
 ## TODO
 * look at ways to avoid `map_fn` for image normalisation in tensorflow graph.
 it breaks optimised graph if we want to use `remove_nodes(op=Identity, op=CheckNumerics)`
 and `quantize_nodes` optimization
-* use weighted loss and IoU in inverse proportion to number class examples
+* use weighted loss and IoU in inverse proportion to number of class examples
