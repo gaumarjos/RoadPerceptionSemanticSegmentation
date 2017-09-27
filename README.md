@@ -221,7 +221,8 @@ the graph visualisation and training statistics like the following:
 
 ![training loss/IoU visualisation](imgs/tensorboard_training.png)
 
-Here we trained for 90 epochs in 6 runs, first run was for 25 epochs with learning
+Here we trained end-to-end (including the encoder/VGG16) for 90 epochs
+in 6 runs, first run was for 25 epochs with learning
 rate of 0.0001. Second run has same learning rate, which was too high as we see
 volatility in convergence. For remaining runs we used learning rate of 0.00001.
 The optimizer goal is cross-entropy loss.
@@ -330,9 +331,22 @@ Running on video stuttgart02.mp4, output to: stuttgart02_segmented.mp4
  65%|█████████████████████████████████████████████████████████████████▎                                   | 777/1201 [02:34<01:24,  5.04it/s
 ```
 
+The result on video that is part of Cityscapes, i.e. network trained on same
+resolution pictures from similar environment. Works great!
+
+[![Video result on Cityscapes video](imgs/video_cityscapes.png)](https://youtu.be/rJrD12u4lSI)
+
+And here is the result on video from completely different environment.
+This is highway driving scenario in California.
+Also the network on full sized video which is much larger resolution
+than it was trained on. Does not work as well
+The processing time on this is 1.2 seconds/frame,
+i.e. much larger.
+
+[![Video result on random video video](imgs/video_highway.png)](https://youtu.be/FAZlIhES7_M)
 
 
-## TODO
+## Ways to Improve
 * look at ways to avoid `map_fn` for image normalisation in tensorflow graph.
 it breaks optimised graph if we want to use `remove_nodes(op=Identity, op=CheckNumerics)`
 and `quantize_nodes` optimization
