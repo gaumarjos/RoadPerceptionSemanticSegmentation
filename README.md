@@ -216,25 +216,28 @@ If you then open tensorboard address `http://192.168.0.1:8080/` in your web brow
 you will see
 the graph visualisation and training statistics like the following:
 
-![training visualisation](imgs/tensorboard_training.png)
+![training loss/IoU visualisation](imgs/tensorboard_training.png)
 
 Here we trained for 90 epochs in 6 runs, first run was for 25 epochs with learning
 rate of 0.0001. Second run has same learning rate, which was too high as we see
 volatility in convergence. For remaining runs we used learning rate of 0.00001.
+The optimizer goal is cross-entropy loss.
 
 We also measured mean [Intersection over Union, IoU](https://en.wikipedia.org/wiki/Jaccard_index)
 metric. On average, across all 35 classes, it is about 40%.
 But it is not weighted. Classes in Cityscapes dataset are not balanced.
 For example there are much less traffic signs pixels than that of road surface or
 sky. One way to improve accuracy (and training convergence) is to weigh
-both loss (we use standard mean cross entropy loss) and IoU with weights
+both loss (we use standard
+[mean cross entropy loss](https://en.wikipedia.org/wiki/Cross_entropy#Cross-entropy_error_function_and_logistic_regression))
+and IoU with weights
 inversely proportional to how classes are represented.
 
 Tensorboard also allows to see the input images alongside with visualised
 class predictions (here we rescale pixel intensities to 0..255 so it is easier
 to see what is going on):
 
-![training visualisation](imgs/tensorboard_images.png)
+![training input/output visualisation](imgs/tensorboard_images.png)
 
 
 ## TODO
