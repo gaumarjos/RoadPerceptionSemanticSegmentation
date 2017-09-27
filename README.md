@@ -90,7 +90,7 @@ cityscapes
 │   └── license.txt
 ```
 
-We use 2475 labeled images for training:
+We use 2975 labeled images for training:
 ```
 $ find cityscapes/data/gtFine/train -type f -name '*gtFine*labelTrainIds.png'  | wc -l
     2975
@@ -105,35 +105,32 @@ hard to see the labels):
 ![labels image](imgs/aachen_000005_000019_gtFine_labelTrainIds.png)
 
 
-### Setup
-##### Frameworks and Packages
-Make sure you have the following is installed:
- - [Python 3](https://www.python.org/)
- - [TensorFlow](https://www.tensorflow.org/)
- - [NumPy](http://www.numpy.org/)
- - [SciPy](https://www.scipy.org/)
-##### Dataset
-Download the [Kitti Road dataset](http://www.cvlibs.net/datasets/kitti/eval_road.php) from [here](http://www.cvlibs.net/download.php?file=data_road.zip).  Extract the dataset in the `data` folder.  This will create the folder `data_road` with all the training a test images.
+## Setup
 
-### Start
-##### Implement
-Implement the code in the `main.py` module indicated by the "TODO" comments.
-The comments indicated with "OPTIONAL" tag are not required to complete.
-##### Run
+We use [Python 3](https://www.python.org/), [anadonda distribution](https://docs.anaconda.com/anaconda/install.html)
+
+Provided [requirements.txt](requirements.txt) lists the used packages.
+
+The implementation is in pure tensorflow.
+We recommend [building tensorflow from sources](https://www.tensorflow.org/install/install_sources)
+to fully utilise your hardware capabilities.
+In this work we used tensorflow 1.3
+
+
+## Implementation Notes
+[fcn8vgg16.py](fcn8vgg16.py) is the definition of network architecture (as per paper above).
+It is using [VGG16](https://arxiv.org/abs/1409.1556) architecture for encoder part of the network.
+We use pre-trained VGG16 weights provided by Udacity for initialization before training.
+The download happens automatically first time you run training.
+
+## How to Run
 Run the following command to run the project:
 ```
 python main.py
 ```
-**Note** If running this in Jupyter Notebook system messages, such as those regarding test status, may appear in the terminal rather than the notebook.
 
-### Submission
-1. Ensure you've passed all the unit tests.
-2. Ensure you pass all points on [the rubric](https://review.udacity.com/#!/rubrics/989/view).
-3. Submit the following in a zip file.
- - `helper.py`
- - `main.py`
- - `project_tests.py`
- - Newest inference images from `runs` folder
- 
- ## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+
+## TODO
+* look at ways to avoid `map_fn` for image normalisation in tensorflow graph.
+it breaks optimised graph
+
