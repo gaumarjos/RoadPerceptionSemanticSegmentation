@@ -235,12 +235,19 @@ both loss (we use standard
 [mean cross entropy loss](https://en.wikipedia.org/wiki/Cross_entropy#Cross-entropy_error_function_and_logistic_regression))
 and IoU with weights
 inversely proportional to how classes are represented.
+We achieved the mean loss or about 0.2 (for 35 classes). The convergence stops/becomes
+really slow after that.
 
 Tensorboard also allows to see the input images alongside with visualised
 class predictions (here we rescale pixel intensities to 0..255 so it is easier
 to see what is going on):
 
 ![training input/output visualisation](imgs/tensorboard_images.png)
+
+Finally we can expect the calculation graph:
+
+![FCN calculation graph](imgs/tensorboard_graph.png)
+
 
 
 ### Freezing Variables
@@ -285,6 +292,17 @@ python main.py predict --gpu=1 --xla=2 --model_dir=optimised_model
 
 by default it runs on `../cityscapes/data/leftImg8bit/test/*/*.png` and saves
 results in a new folder under `runs`
+
+You would see at the end of the output:
+```
+Predicting on test images ../cityscapes/data/leftImg8bit/test/*/*.png to: runs/20170927_164210
+Predicting (last tf call 53 ms, avg tf 51 ms, last img 145 ms, avg 144 ms): 100%|████████████████████| 1525/1525 [08:36<00:00,  2.97images/s]
+```
+
+The 'tf call/avg' is time, in milliseconds, to execute session.run to get the predictions.
+'last img/avg' is time, in milliseconds, to superimpose the segmentation results
+over the original image. There is an overhead to load and save images which is
+not measured.
 
 Here is an example of input test image and resulting segmented output
 
