@@ -353,7 +353,7 @@ def optimise_graph(args):
     shutil.move(args.frozen_model_dir+'/optimised_graph.pb', args.optimised_model_dir)
 
 
-def predict_video(args):
+def predict_video(args, image_shape=None):
     if args.video_file_in is None:
         print("for video processing need --video_file_in")
         return
@@ -362,6 +362,8 @@ def predict_video(args):
         return
 
     def process_frame(image):
+        if image_shape is not None:
+            image = scipy.misc.imresize(image, image_shape)
         segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
         return segmented_image
 
@@ -374,9 +376,10 @@ def predict_video(args):
         input_clip = VideoFileClip(args.video_file_in)
         annotated_clip = input_clip.fl_image(process_frame)
         annotated_clip.write_videofile(args.video_file_out, audio=False)
-        # for 512x256 size
-        # ubuntu/1080ti. with GPU 4.8fps. with CPU the same??
-        # full size 1440x720
+        # for half size
+        # ubuntu/1080ti. with GPU ??fps. with CPU the same??
+        # mac/cpu 1.8s/frame
+        # full size 1280x720
         # ubuntu/gpu 1.2s/frame i.e. 0.8fps :(
         # ubuntu/cpu 1.2fps
         # mac cpu 6.5sec/frame
@@ -480,4 +483,6 @@ if __name__ == '__main__':
     elif args.action == 'optimise':
         optimise_graph(args)
     elif args.action == 'video':
-        predict_video(args)
+        #image_shape = None
+        image_shape = (int(720/2), int(1280/2))
+        predict_video(args, image_shape)
