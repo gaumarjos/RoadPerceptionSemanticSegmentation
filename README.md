@@ -104,6 +104,9 @@ hard to see the labels):
 
 ![labels image](imgs/aachen_000005_000019_gtFine_labelTrainIds.png)
 
+It is assumed the cityscapes folder are next to this repo in local filesystem and
+it has similar structure as above.
+
 
 ## Setup
 
@@ -272,6 +275,24 @@ This increases number of operations to 369 (to convert between quantised and
 normal quantities) but decreases network size to 73mb.
 
 
+### Inference on Images
+
+We can run predictions on test Cityscapes images as follows:
+
+```
+python main.py predict --gpu=1 --xla=2 --model_dir=optimised_model
+```
+
+by default it runs on `../cityscapes/data/leftImg8bit/test/*/*.png` and saves
+results in a new folder under `runs`
+
+Here is an example of input test image and resulting segmented output
+
+![original image](imgs/test_input.png)
+
+![results of segmentation superimposed on original image](imgs/test_segmented.png)
+
+We see that it correctly identifies pedestrians, road, traffic lights, road signs, bicycles etc.
 
 
 ## TODO
