@@ -29,8 +29,8 @@ For the task at hand we chose [Cityscapes dataset](https://www.cityscapes-datase
 which provides detailed labeled examples of road scene images
 from 50 German cities, across all seasons, just daytime in moderate/good
 weather conditions. It has fine ground truth labels for 35 classes of
-various classes of objects
-in the scene relevant for tasks of autonomous vehicle perception.
+various objects
+in the scene which are relevant for tasks of autonomous vehicle perception.
 
 The data need to be downloaded. In this work we use
 gtFine_trainvaltest.zip (241MB) and leftImg8bit_trainvaltest.zip (11GB)
@@ -104,8 +104,8 @@ hard to see the labels):
 
 ![labels image](imgs/aachen_000005_000019_gtFine_labelTrainIds.png)
 
-It is assumed the cityscapes folder are next to this repo in local filesystem and
-it has similar structure as above.
+It is assumed the `cityscapes` folder is next to this repo in local filesystem and
+it has similar structure as shown above.
 
 
 ## Setup
@@ -128,13 +128,13 @@ It is using [VGG16](https://arxiv.org/abs/1409.1556) architecture for encoder pa
 We use pre-trained VGG16 weights provided by Udacity for initialization before training.
 The download happens automatically first time you run training.
 
-[main.py](main.py) is the driving script. It takes most of the inputs from command
+[main.py](main.py) is the driver script. It takes most of the inputs from command
 line arguments.
 
 
 ## How to Run
 
-If run without arguments the `main.py` lists the list of options it takes:
+If run without arguments  `main.py` lists the possible options:
 ```
 $ python main.py
 usage: main.py [-h] [-g GPU] [-gm GPU_MEM] [-x {1,2}] [-ep EPOCHS]
@@ -188,7 +188,10 @@ INFO:tensorflow:Restoring parameters from b'pretrained_vgg/vgg/variables/variabl
 2017-09-27 09:11:29.055226: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1045] Creating TensorFlow device (/gpu:0) -> (device: 0, name: GeForce GTX 1080 Ti, pci bus id: 0000:01:00.0)
 INFO:tensorflow:Restoring parameters from ckpt/fcn8vgg16-26810
 Train Epoch  1/10 (loss 0.195):   1%|          | 7/595 [00:13<18:20,  1.87s/batches]
+
 ...
+
+
 INFO:tensorflow:No assets to save.
 INFO:tensorflow:No assets to write.
 INFO:tensorflow:SavedModel written to: b'runs/20170927_091136/model/saved_model.pb'
@@ -245,7 +248,7 @@ to see what is going on):
 
 ![training input/output visualisation](imgs/tensorboard_images.png)
 
-Finally we can inspect the calculation graph:
+We can inspect the calculation graph in Tensorboard:
 
 ![FCN calculation graph](imgs/tensorboard_graph.png)
 
@@ -300,9 +303,10 @@ Predicting on test images ../cityscapes/data/leftImg8bit/test/*/*.png to: runs/2
 Predicting (last tf call 53 ms, avg tf 51 ms, last img 145 ms, avg 144 ms): 100%|████████████████████| 1525/1525 [08:36<00:00,  2.97images/s]
 ```
 
-The 'tf call/avg' is time, in milliseconds, to execute session.run to get the predictions.
+The 'tf call/avg' is time, in milliseconds, to execute `session.run`
+ to get the predictions.
 'last img/avg' is time, in milliseconds, to superimpose the segmentation results
-over the original image. There is an overhead to load and save images which is
+over the original image. There is also an overhead to load and save images which is
 not measured.
 
 Here is an example of input test image and resulting segmented output
@@ -336,12 +340,13 @@ resolution pictures from similar environment. Works great!
 
 [![Video result on Cityscapes video](imgs/video_cityscapes.png)](https://youtu.be/rJrD12u4lSI)
 
-And here is the result on video from completely different environment.
-This is highway driving scenario in California.
-Also the network on full sized video which is much larger resolution
-than it was trained on. Does not work as well
+And here is the result on a video from completely different environment.
+This is a highway driving scenario in California.
+It is also a full sized video with much larger resolution
+than the images we trained our network on.
+We see that it does not work as well as previous example.
 The processing time on this is 1.2 seconds/frame,
-i.e. much larger.
+i.e. much slower.
 
 [![Video result on random video video](imgs/video_highway.png)](https://youtu.be/FAZlIhES7_M)
 
