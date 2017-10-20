@@ -56,7 +56,7 @@ def maybe_download_pretrained_vgg(data_dir):
         zip_ref.close()
 
         # Remove zip file to save space
-        os.remove(vgg_filename)
+        #os.remove(vgg_filename)
 
 
 
