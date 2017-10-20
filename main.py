@@ -39,6 +39,8 @@ def load_trained_vgg_vars(sess):
     """
     # Download pretrained vgg model
     vgg_path = 'pretrained_vgg/vgg'
+    # vgg_path = 'runs/20171020_105935/model'   # to use my own trained weights
+    
     helper.maybe_download_pretrained_vgg(vgg_path)
     # load model
     vgg_tag = 'vgg16'
@@ -110,11 +112,22 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
 def train(args, image_shape):
     config = session_config(args)
 
+
     # extract pre-trained VGG weights
     with tf.Session(config=config) as sess:
         var_values = load_trained_vgg_vars(sess)
     tf.reset_default_graph()
-
+    
+    """
+    checkpoint = tf.train.get_checkpoint_state(args.ckpt_dir)
+    input_checkpoint = checkpoint.model_checkpoint_path
+    print("importing from {}".format(input_checkpoint))
+    saver = tf.train.import_meta_graph(input_checkpoint + '.meta', clear_devices=True)
+    graph = tf.get_default_graph()
+    input_graph_def = graph.as_graph_def()
+    print("{} ops in the input graph".format(len(input_graph_def.node)))
+    """
+    
     with tf.Session(config=config) as sess:
         # define our FCN
         num_classes = len(cityscape_labels.labels)
@@ -123,7 +136,7 @@ def train(args, image_shape):
         # variables initialization
         sess.run(tf.global_variables_initializer())
         model.restore_variables(sess, var_values)
-
+        
         # Create batch generator
         # TODO: Augment Images for better results
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
@@ -333,7 +346,7 @@ def optimise_graph(args):
     # reading optimised graph
     tf.reset_default_graph()
     gd = tf.GraphDef()
-    output_graph_file = args.frozen_model_dir+"/optimised_graph.pb"
+    output_graph_file = args.frozen_model_dir+"/graph.pb"     # era optimised_graph.pb
     with tf.gfile.Open(output_graph_file, 'rb') as f:
         gd.ParseFromString(f.read())
     tf.import_graph_def(gd, name='')
@@ -350,7 +363,7 @@ def optimise_graph(args):
     tf.import_graph_def(gd, name='')
     with tf.Session() as sess:
         model.save_model(sess, args.optimised_model_dir)
-    shutil.move(args.frozen_model_dir+'/optimised_graph.pb', args.optimised_model_dir)
+    shutil.move(args.frozen_model_dir+'/graph.pb', args.optimised_model_dir)     # era optimised_graph.pb
 
 
 def predict_video(args, image_shape=None):
