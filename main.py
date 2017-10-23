@@ -10,6 +10,7 @@ import re
 import random
 from timeit import default_timer as timer
 import math
+import pickle
 
 import tensorflow as tf
 from tensorflow.python.framework import graph_util as tf_graph_util
@@ -21,6 +22,7 @@ from moviepy.editor import VideoFileClip
 import helper
 import cityscape_labels
 import fcn8vgg16
+import camera_calibration
 
 """Semantic Segmentation with Fully Convolutional Networks
 
@@ -361,10 +363,36 @@ def predict_video(args, image_shape=None):
     if args.video_file_out is None:
         print("for video processing need --video_file_out")
         return
-
+        
+    # Camera calibration
+    camera_intrinsic_calibration_filename='camera_calibration/sekonix120.p'
+    camera_intrinsic_calibration_folder='camera_calibration/sekonix120/'
+    
+    def generate_intrinsic_calibration(self):
+            mtx, dist = camera_calibration(img_size=[1920, 1218],
+                                           calibration_filenames=camera_intrinsic_calibration_folder + '*.jpg',
+                                           verbose=False)
+            return
+    
+    try:
+        cal = pickle.load(open(camera_intrinsic_calibration_filename, "rb"))
+        mtx = cal["mtx"]
+        dist = cal["dist"]
+        print("Camera calibration file loaded")
+    except:
+        print("WARNING: Couldn't load camera calibration file, generate one using generate_intrinsic_calibration")
+        mtx = None
+        dist = None
+    
+    # The actual frame processing is dealt with in this function
     def process_frame(image):
         if image_shape is not None:
-            image = scipy.misc.imresize(image, image_shape)
+            # Apply intrisic camera calibration (undistort)
+            if mtx is not None:
+                image_corr = camera_calibration.undistort_image(image, mtx, dist)
+            else:
+                image_corr = image
+            image = scipy.misc.imresize(image_corr, image_shape)
         segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
         return segmented_image
 
@@ -375,7 +403,7 @@ def predict_video(args, image_shape=None):
         print('Running on video {}, output to: {}'.format(args.video_file_in, args.video_file_out))
         colors = get_colors()
         input_clip = VideoFileClip(args.video_file_in)
-        annotated_clip = input_clip.fl_image(process_frame)
+        annotated_clip = input_clip.fl_image(process_frame).subclip(2*60,3*60)
         annotated_clip.write_videofile(args.video_file_out, audio=False)
         # for half size
         # ubuntu/1080ti. with GPU ??fps. with CPU the same??
@@ -384,7 +412,6 @@ def predict_video(args, image_shape=None):
         # ubuntu/gpu 1.2s/frame i.e. 0.8fps :(
         # ubuntu/cpu 1.2fps
         # mac cpu 6.5sec/frame
-
 
 
 def get_colors():
