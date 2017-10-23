@@ -39,7 +39,6 @@ def load_trained_vgg_vars(sess):
     """
     # Download pretrained vgg model
     vgg_path = 'pretrained_vgg/vgg'
-    # vgg_path = 'runs/20171020_105935/model'   # to use my own trained weights
     
     helper.maybe_download_pretrained_vgg(vgg_path)
     # load model
@@ -111,22 +110,11 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
 
 def train(args, image_shape):
     config = session_config(args)
-
-
+    
     # extract pre-trained VGG weights
     with tf.Session(config=config) as sess:
         var_values = load_trained_vgg_vars(sess)
     tf.reset_default_graph()
-    
-    """
-    checkpoint = tf.train.get_checkpoint_state(args.ckpt_dir)
-    input_checkpoint = checkpoint.model_checkpoint_path
-    print("importing from {}".format(input_checkpoint))
-    saver = tf.train.import_meta_graph(input_checkpoint + '.meta', clear_devices=True)
-    graph = tf.get_default_graph()
-    input_graph_def = graph.as_graph_def()
-    print("{} ops in the input graph".format(len(input_graph_def.node)))
-    """
     
     with tf.Session(config=config) as sess:
         # define our FCN
