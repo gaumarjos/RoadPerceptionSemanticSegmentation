@@ -2,13 +2,13 @@
 
 # ideal transforms, but some of them break inference
 #+add_default_attributes
-#- remove_nodes(op=Identity, op=CheckNumerics)
+#- remove_nodes(op=Identity, op=CheckNumerics) --> poi non funziona piu' col video
 #+fold_constants(ignore_errors=true)
 #+fold_batch_norms
 #+fold_old_batch_norms
 #+fuse_resize_and_conv
 #+quantize_weights increase time from 18ms to 50ms. quality seems ok
-#- quantize_nodes
+#- quantize_nodes --> poi non funziona piu' col video
 #+strip_unused_nodes
 #+sort_by_execution_order
 
@@ -31,3 +31,12 @@ quantize_weights
 strip_unused_nodes
 sort_by_execution_order'
 
+#--transforms='
+#add_default_attributes
+#fold_constants(ignore_errors=true)
+#fold_batch_norms
+#fold_old_batch_norms
+#fuse_resize_and_conv
+#quantize_weights
+#strip_unused_nodes
+#sort_by_execution_order'

@@ -388,12 +388,10 @@ def predict_video(args, image_shape=None):
     # The actual frame processing is dealt with in this function
     def process_frame(image):
         if image_shape is not None:
-            # Apply intrisic camera calibration (undistort)
-            if mtx is not None:
-                image_corr = camera_calibration.undistort_image(image, mtx, dist)
-            else:
-                image_corr = image
-            image = scipy.misc.imresize(image_corr, image_shape)
+            with tf.device('/cpu:0'):  # tried this to speed up processing but not really improving time...
+                # Apply intrisic camera calibration (undistort)
+                image = camera_calibration.undistort_image(image, mtx, dist)  # adds about 14% of overhead
+                image = scipy.misc.imresize(image, image_shape)  # really necessary
         segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
         return segmented_image
 
