@@ -365,8 +365,8 @@ def predict_video(args, image_shape=None):
         return
         
     # Camera calibration
-    camera_intrinsic_calibration_filename='camera_calibration/sekonix120.p'
-    camera_intrinsic_calibration_folder='camera_calibration/sekonix120/'
+    camera_intrinsic_calibration_filename='../videos/camera_calibration/sekonix120.p'
+    camera_intrinsic_calibration_folder='../videos/camera_calibration/sekonix120/'
     
     def generate_intrinsic_calibration(self):
             mtx, dist = camera_calibration(img_size=[1920, 1218],
@@ -403,7 +403,10 @@ def predict_video(args, image_shape=None):
         print('Running on video {}, output to: {}'.format(args.video_file_in, args.video_file_out))
         colors = get_colors()
         input_clip = VideoFileClip(args.video_file_in)
-        annotated_clip = input_clip.fl_image(process_frame).subclip(2*60,3*60)
+        if args.video_start_second is None or args.video_end_second is None:
+            annotated_clip = input_clip.fl_image(process_frame)
+        else:
+            annotated_clip = input_clip.fl_image(process_frame).subclip(args.video_start_second,args.video_end_second)
         annotated_clip.write_videofile(args.video_file_out, audio=False)
         # for half size
         # ubuntu/1080ti. with GPU ??fps. with CPU the same??
@@ -462,6 +465,8 @@ def parse_args():
     parser.add_argument('-lp', '--labels_paths', help="label images path/file pattern. e.g. 'train/label*.png'", type=str, default=None)
     parser.add_argument('-vi', '--video_file_in', help="mp4 video file to process", type=str, default=None)
     parser.add_argument('-vo', '--video_file_out', help="mp4 video file to save results", type=str, default=None)
+    parser.add_argument('-vs', '--video_start_second', help="video start second", type=int, default=None)
+    parser.add_argument('-ve', '--video_end_second', help="video end second", type=int, default=None)
     args = parser.parse_args()
     return args
 
