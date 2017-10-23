@@ -12,7 +12,11 @@
 #+strip_unused_nodes
 #+sort_by_execution_order
 
-~/dev/tf/tensorflow-r1.3/bazel-bin/tensorflow/tools/graph_transforms/transform_graph \
+
+# https://github.com/tensorflow/tensorflow/tree/master/tensorflow/tools/graph_transforms
+
+#~/dev/tf/tensorflow-r1.3/bazel-bin/tensorflow/tools/graph_transforms/transform_graph \
+~/tensorflow/bazel-bin/tensorflow/tools/graph_transforms/transform_graph \
 --in_graph=$1/graph.pb \
 --out_graph=$1/optimised_graph.pb \
 --inputs=data/images \

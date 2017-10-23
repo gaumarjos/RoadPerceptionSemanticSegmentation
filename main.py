@@ -332,11 +332,12 @@ def optimise_graph(args):
 
     print('calling c++ implementation of graph transform')
     os.system('./optimise.sh {}'.format(args.frozen_model_dir))
+    print('called c++ implementation of graph transform')
 
     # reading optimised graph
     tf.reset_default_graph()
     gd = tf.GraphDef()
-    output_graph_file = args.frozen_model_dir+"/graph.pb"     # era optimised_graph.pb
+    output_graph_file = args.frozen_model_dir+"/optimised_graph.pb"
     with tf.gfile.Open(output_graph_file, 'rb') as f:
         gd.ParseFromString(f.read())
     tf.import_graph_def(gd, name='')
@@ -353,7 +354,7 @@ def optimise_graph(args):
     tf.import_graph_def(gd, name='')
     with tf.Session() as sess:
         model.save_model(sess, args.optimised_model_dir)
-    shutil.move(args.frozen_model_dir+'/graph.pb', args.optimised_model_dir)     # era optimised_graph.pb
+    shutil.move(args.frozen_model_dir+'/optimised_graph.pb', args.optimised_model_dir)
 
 
 def predict_video(args, image_shape=None):
