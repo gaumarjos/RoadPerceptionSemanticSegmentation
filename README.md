@@ -1,3 +1,5 @@
+# WORK (LEARN) IN PROGRESS
+
 # Semantic Segmentation using Fully Convolutional Networks
 
 ## Introduction
