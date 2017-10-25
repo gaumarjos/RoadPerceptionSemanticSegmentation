@@ -68,7 +68,9 @@ class FCN8_VGG16:
             saver.restore(sess, ckpt.model_checkpoint_path)
 
     def train(self, sess,
-              epochs, batch_size, get_batches_fn, n_samples,
+              epochs, batch_size,
+              get_batches_fn, n_samples,
+              get_val_batches_fn, val_n_samples,          # STE
               keep_prob_value, learning_rate,
               ckpt_dir=None, summaries_dir=None):
         """
@@ -143,6 +145,8 @@ class FCN8_VGG16:
 
             l /= n_samples
             # batches_pbar.set_description("loss over last epoch {}".format(l))
+
+            print("INSERIRE VALIDATION QUI")
 
             if saver is not None:
                 save_path = saver.save(sess, checkpoint_dir, global_step=self._global_step)

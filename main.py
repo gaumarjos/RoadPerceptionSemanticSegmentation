@@ -76,6 +76,9 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
     num_classes = len(cityscape_labels.labels)
     num_samples = len(image_paths)
     assert len(image_paths) == len(label_paths)
+    
+    print("NUMERO")
+    print(num_samples)
 
     def get_batches_fn(batch_size):
         """
@@ -89,10 +92,27 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
             images = []
             gt_images = []
             for image_file in image_paths[batch_i:batch_i+batch_size]:
+                start_time = time.time()
                 gt_image_file = label_paths[os.path.basename(image_file)]
 
-                image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
-                gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)
+                image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)         # 256x512x3
+                gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)   # 256*512*1, the value is the label
+
+                # Augmentation by flipping and translating
+                flip_prob = random.random()
+                if flip_prob > 0.5:
+                    image = cv2.flip(image, 1)
+                    gt_image = cv2.flip(gt_image, 1)
+
+                translate_prob = random.random()
+                if translate_prob > 0.5:
+                    tx = 0
+                    ty = 20
+                    M = np.float32([[1,0,tx],[0,1,ty]])
+                    #scipy.misc.imsave('augmentation_test/trans_0.png', image)
+                    image = cv2.warpAffine(image, M, image_shape[::-1])
+                    gt_image = cv2.warpAffine(gt_image, M, image_shape[::-1])
+                    #scipy.misc.imsave('augmentation_test/trans_1.png', image)
 
                 gt_image = gt_image.reshape(*gt_image.shape, 1)
                 tmp = []
@@ -102,6 +122,9 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
                   gt_bg = gt_bg.reshape(*gt_bg.shape, 1)
                   tmp.append(gt_bg)
                 gt_image = np.concatenate(tmp, axis=2)
+
+                duration = time.time() - start_time
+                print('Pre-processing time per image: {}'.format(duration))
 
                 images.append(image)
                 gt_images.append(gt_image)
@@ -134,12 +157,16 @@ def train(args, image_shape):
         train_batches_fn, num_samples = get_train_batch_generator_cityscapes(args.images_paths,
                                                                              args.labels_paths,
                                                                              image_shape)
+        val_batches_fn, val_num_samples = get_train_batch_generator_cityscapes(args.images_paths,                           # tieni la stessa cartella per ora, per vedere se il risultato e' lo stesso
+                                                                               args.labels_paths,
+                                                                               image_shape)
         time_str = time.strftime("%Y%m%d_%H%M%S")
         run_name = "/{}_ep{}_b{}_lr{:.6f}_kp{}".format(time_str, args.epochs, args.batch_size, args.learning_rate, args.keep_prob)
         start_time = time.time()
 
         final_loss = model.train(sess, args.epochs, args.batch_size,
                                  train_batches_fn, num_samples,
+                                 val_batches_fn, val_num_samples,                     # aggiunta io
                                  args.keep_prob, args.learning_rate,
                                  args.ckpt_dir, args.summary_dir+run_name)
 
