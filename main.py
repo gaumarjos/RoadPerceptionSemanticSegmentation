@@ -109,10 +109,10 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
                 tx = 0
                 ty = random.randint(0,20)
                 M = np.float32([[1,0,tx],[0,1,ty]])
-                scipy.misc.imsave('augmentation_test/trans_{}_a.png'.format(count), image)
+                # scipy.misc.imsave('augmentation_test/trans_{}_a.png'.format(count), image)
                 image = cv2.warpAffine(image, M, image_shape[::-1])
                 gt_image = cv2.warpAffine(gt_image, M, image_shape[::-1])
-                scipy.misc.imsave('augmentation_test/trans_{}_b.png'.format(count), image)
+                # scipy.misc.imsave('augmentation_test/trans_{}_b.png'.format(count), image)
 
                 gt_image = gt_image.reshape(*gt_image.shape, 1)
                 tmp = []
