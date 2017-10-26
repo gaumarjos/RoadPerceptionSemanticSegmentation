@@ -98,21 +98,20 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
                 image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)         # 256x512x3
                 gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)   # 256*512*1, the value is the label
 
-                # Augmentation by flipping and translating
+                # Augmentation by flipping
                 flip_prob = random.random()
                 if flip_prob > 0.5:
                     image = cv2.flip(image, 1)
                     gt_image = cv2.flip(gt_image, 1)
 
-                translate_prob = random.random()
-                if translate_prob > 0.5:
-                    tx = 0
-                    ty = 20
-                    M = np.float32([[1,0,tx],[0,1,ty]])
-                    #scipy.misc.imsave('augmentation_test/trans_0.png', image)
-                    image = cv2.warpAffine(image, M, image_shape[::-1])
-                    gt_image = cv2.warpAffine(gt_image, M, image_shape[::-1])
-                    #scipy.misc.imsave('augmentation_test/trans_1.png', image)
+                # Augmentation by translating vertically
+                tx = 0
+                ty = random.randint(0,20)
+                M = np.float32([[1,0,tx],[0,1,ty]])
+                scipy.misc.imsave('augmentation_test/trans_{}_a.png'.format(count), image)
+                image = cv2.warpAffine(image, M, image_shape[::-1])
+                gt_image = cv2.warpAffine(gt_image, M, image_shape[::-1])
+                scipy.misc.imsave('augmentation_test/trans_{}_b.png'.format(count), image)
 
                 gt_image = gt_image.reshape(*gt_image.shape, 1)
                 tmp = []
@@ -124,7 +123,7 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
                 gt_image = np.concatenate(tmp, axis=2)
 
                 duration = time.time() - start_time
-                print('Pre-processing time per image: {}'.format(duration))
+                #print('Pre-processing time per image: {}'.format(duration))
 
                 images.append(image)
                 gt_images.append(gt_image)
