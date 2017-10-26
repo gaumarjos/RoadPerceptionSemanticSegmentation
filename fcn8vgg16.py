@@ -70,7 +70,7 @@ class FCN8_VGG16:
     def train(self, sess,
               epochs, batch_size,
               get_batches_fn, n_samples,
-              get_val_batches_fn, val_n_samples,          # STE
+              get_val_batches_fn, val_n_samples,  # Added to include validation, not used at the moment
               keep_prob_value, learning_rate,
               ckpt_dir=None, summaries_dir=None):
         """
@@ -109,10 +109,12 @@ class FCN8_VGG16:
                                 unit='batches',
                                 total=n_batches)
             
+            """
             val_batches_pbar = tqdm(get_val_batches_fn(batch_size),
                                     desc='Validation Epoch {:>2}/{} (loss _.___)'.format(epoch + 1, epochs),
                                     unit='batches',
                                     total=n_batches)
+            """
             
             n = 0.
             l = 0.
@@ -154,6 +156,7 @@ class FCN8_VGG16:
 
             # Validation code starts (to be debugged)
             # The code works without errors but for some reason running the validation on the same training dataset doesn't produce the same result as the train operation just above.
+            """
             val_n = 0.
             val_l = 0.
             for images, labels in val_batches_pbar:
@@ -170,6 +173,7 @@ class FCN8_VGG16:
                 val_batches_pbar.set_description(
                     'Validation Epoch {:>2}/{} (loss {:.3f})'.format(epoch + 1, epochs, val_l / val_n))
             val_l /= n_samples
+            """
             # Validation code ends
 
             if saver is not None:
