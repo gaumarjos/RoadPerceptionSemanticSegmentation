@@ -98,6 +98,7 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
                 image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)         # 256x512x3
                 gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)   # 256*512*1, the value is the label
 
+                # https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
                 # Augmentation by flipping
                 flip_prob = random.random()
                 if flip_prob > 0.5:
@@ -151,12 +152,11 @@ def train(args, image_shape):
         model.restore_variables(sess, var_values)
         
         # Create batch generator
-        # TODO: Augment Images for better results
-        #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
         train_batches_fn, num_samples = get_train_batch_generator_cityscapes(args.images_paths,
                                                                              args.labels_paths,
                                                                              image_shape)
-        val_batches_fn, val_num_samples = get_train_batch_generator_cityscapes(args.images_paths,                           # tieni la stessa cartella per ora, per vedere se il risultato e' lo stesso
+        # The following lines needs to be changed to use validation data data instead of train data. The reason I'm now using train data is to see if the results are comparable.
+        val_batches_fn, val_num_samples = get_train_batch_generator_cityscapes(args.images_paths,
                                                                                args.labels_paths,
                                                                                image_shape)
         time_str = time.strftime("%Y%m%d_%H%M%S")
