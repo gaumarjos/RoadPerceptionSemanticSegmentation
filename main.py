@@ -394,10 +394,10 @@ def predict_video(args, image_shape=None):
     camera_intrinsic_calibration_folder='../videos/camera_calibration/sekonix120/'
     
     def generate_intrinsic_calibration(self):
-            mtx, dist = camera_calibration(img_size=[1920, 1218],
-                                           calibration_filenames=camera_intrinsic_calibration_folder + '*.jpg',
-                                           verbose=False)
-            return
+        mtx, dist = camera_calibration(img_size=[1920, 1218],
+                                       calibration_filenames=camera_intrinsic_calibration_folder + '*.jpg',
+                                       verbose=False)
+        return
     
     try:
         cal = pickle.load(open(camera_intrinsic_calibration_filename, "rb"))
@@ -413,8 +413,8 @@ def predict_video(args, image_shape=None):
     def process_frame(image):
         if image_shape is not None:
             with tf.device('/cpu:0'):  # tried this to speed up processing but not really improving time...
-                # Apply intrisic camera calibration (undistort)
-                image = camera_calibration.undistort_image(image, mtx, dist)  # adds about 14% of overhead
+                # Apply intrisic camera calibration (undistort) --> not needed as I've already undistorted the test videos beforehand
+                # image = camera_calibration.undistort_image(image, mtx, dist)  # adds about 14% of overhead
                 image = scipy.misc.imresize(image, image_shape)  # really necessary
         segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
         # print((tf_time_ms, img_time_ms))
