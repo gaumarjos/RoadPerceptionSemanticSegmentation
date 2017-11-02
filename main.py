@@ -98,14 +98,15 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
                 image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)         # 256x512x3
                 gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)   # 256*512*1, the value is the label
 
+                """
                 # https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
-                # Augmentation by flipping
+                # Augmentation by flipping --> not sure this helps, because traffic data are naturally quite uniform left and right and flipping introduces traffic signs, for example, that don't exist in reality
                 flip_prob = random.random()
                 if flip_prob > 0.5:
                     image = cv2.flip(image, 1)
                     gt_image = cv2.flip(gt_image, 1)
 
-                # Augmentation by translating vertically
+                # Augmentation by translating vertically --> it looked like a smart idea but the result is rather rubbish...
                 tx = 0
                 ty = random.randint(0,20)
                 M = np.float32([[1,0,tx],[0,1,ty]])
@@ -113,6 +114,7 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
                 image = cv2.warpAffine(image, M, image_shape[::-1])
                 gt_image = cv2.warpAffine(gt_image, M, image_shape[::-1])
                 # scipy.misc.imsave('augmentation_test/trans_{}_b.png'.format(count), image)
+                """
 
                 gt_image = gt_image.reshape(*gt_image.shape, 1)
                 tmp = []
