@@ -1,3 +1,12 @@
+"""Semantic Segmentation with Fully Convolutional Networks
+
+Architecture as in https://people.eecs.berkeley.edu/~jonlong/long_shelhamer_fcn.pdf
+
+Trained on Citiscapes data https://www.cityscapes-dataset.com/
+Trained on Mapillary data (added by Stefano Salati)
+"""
+
+
 import os.path
 import os
 import warnings
@@ -21,17 +30,15 @@ import numpy as np
 from moviepy.editor import VideoFileClip
 
 import helper
-import cityscape_labels
 import fcn8vgg16
 import camera_calibration
 
-"""Semantic Segmentation with Fully Convolutional Networks
-
-Architecture as in https://people.eecs.berkeley.edu/~jonlong/long_shelhamer_fcn.pdf
-
-Trained on Citiscapes data https://www.cityscapes-dataset.com/
-"""
-
+dataset = "cityscapes"
+# dataset = "mapillary"
+if dataset == "cityscapes":
+    import cityscape_labels as dataset_labels
+elif dataset == "mapillary":
+    import mapillary_labels as dataset_labels
 
 
 def load_trained_vgg_vars(sess):
@@ -73,7 +80,7 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
     image_paths = glob.glob(images_path_pattern)
     label_paths = {re.sub('_gtFine_labelTrainIds', '_leftImg8bit', os.path.basename(path)): path
                         for path in glob.glob(labels_path_pattern)}
-    num_classes = len(cityscape_labels.labels)
+    num_classes = len(dataset_labels.labels)
     num_samples = len(image_paths)
     assert len(image_paths) == len(label_paths)
     
@@ -146,7 +153,7 @@ def train(args, image_shape):
     
     with tf.Session(config=config) as sess:
         # define our FCN
-        num_classes = len(cityscape_labels.labels)
+        num_classes = len(dataset_labels.labels)
         model = fcn8vgg16.FCN8_VGG16(num_classes)
 
         # variables initialization
@@ -444,11 +451,11 @@ def predict_video(args, image_shape=None):
 
 
 def get_colors():
-    num_classes = len(cityscape_labels.labels)
+    num_classes = len(dataset_labels.labels)
     colors = {}
     transparency_level = 128
     for label in range(num_classes):
-        color = cityscape_labels.trainId2label[label].color
+        color = dataset_labels.trainId2label[label].color
         colors[label] = np.array([color + (transparency_level,)], dtype=np.uint8)
     return colors
 
