@@ -31,7 +31,7 @@ def change_color(fromimage, toimage, fromcolor, tocolor):
     return np.sum(mask)
     
 def find_horizon(image):
-    print(len(np.sum(image, axis=1))
+    print(len(np.sum(image, axis=1)))
     return
 
 
