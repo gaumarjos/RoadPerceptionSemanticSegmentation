@@ -232,13 +232,26 @@ def predict_image(sess, model, image, colors_dict):
 
     # overlay on image
     start_time = timer()
-    stack = np.zeros(tmp_image.shape, tmp_image.dtype)
-    for label in range(len(colors_dict)):
-        active = np.expand_dims(predicted_class[:, :, label], axis=2)
-        layer = np.full(tmp_image.shape, colors_dict[label][0,0:3])
-        layer = cv2.bitwise_and(layer, layer, mask=active)
-        stack = cv2.addWeighted(stack, 1, layer, 1, 0)
-    segmented_image = cv2.addWeighted(tmp_image, 1, stack, 0.5, 0)
+    if faster_image_painting:
+        stack = np.zeros(tmp_image.shape, tmp_image.dtype)
+        for label in range(len(colors_dict)):
+            active = np.expand_dims(predicted_class[:, :, label], axis=2)
+            layer = np.full(tmp_image.shape, colors_dict[label][0,0:3])
+            layer = cv2.bitwise_and(layer, layer, mask=active)
+            stack = cv2.addWeighted(stack, 1, layer, 1, 0)
+        segmented_image = cv2.addWeighted(tmp_image, 1, stack, 0.5, 0)
+    else:
+        result_im = scipy.misc.toimage(image)
+        for label in range(len(colors_dict)):
+            segmentation = np.expand_dims(predicted_class[:, :, label], axis=2)
+            mask = np.dot(segmentation, colors_dict[label])
+            mask = scipy.misc.toimage(mask, mode="RGBA")
+            # paste (from PIL) seem to take time (or rather toimage calls to convert to PIL format).
+            # in the future need to try this to speed up
+            # https://stackoverflow.com/questions/19561597/pil-image-paste-on-another-image-with-alpha
+            result_im.paste(mask, box=None, mask=mask)
+        segmented_image = np.array(result_im)
+      
     duration = timer() - start_time
     img_time_ms = int(duration * 1000)
 
@@ -520,6 +533,10 @@ if __name__ == '__main__':
         train_images_path_pattern = '../mapillary/data/train/*_image.png'
         train_labels_path_pattern = '../mapillary/data/train/*_gt.png'
         test_images_path_pattern  = '../mapillary/data/train/*_image.png'  # TODO
+
+    # This enables a faster (but slightly uglier, less saturated) code to paint on the output images and videos.
+    # The idea is to disable it when preparing images and videos for presentations.
+    faster_image_painting = False
 
     args = parse_args()
 
