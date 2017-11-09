@@ -84,8 +84,7 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
     num_samples = len(image_paths)
     assert len(image_paths) == len(label_paths)
     
-    print("NUMERO")
-    print(num_samples)
+    print("Number of samples used in training: {}".format(num_samples))
 
     def get_batches_fn(batch_size):
         """
@@ -164,17 +163,18 @@ def train(args, image_shape):
         train_batches_fn, num_samples = get_train_batch_generator_cityscapes(args.images_paths,
                                                                              args.labels_paths,
                                                                              image_shape)
+        """
         # The following lines needs to be changed to use validation data data instead of train data. The reason I'm now using train data is to see if the results are comparable.
         val_batches_fn, val_num_samples = get_train_batch_generator_cityscapes(args.images_paths,
                                                                                args.labels_paths,
                                                                                image_shape)
+        """
         time_str = time.strftime("%Y%m%d_%H%M%S")
         run_name = "/{}_ep{}_b{}_lr{:.6f}_kp{}".format(time_str, args.epochs, args.batch_size, args.learning_rate, args.keep_prob)
         start_time = time.time()
 
         final_loss = model.train(sess, args.epochs, args.batch_size,
                                  train_batches_fn, num_samples,
-                                 val_batches_fn, val_num_samples,                     # aggiunta io
                                  args.keep_prob, args.learning_rate,
                                  args.ckpt_dir, args.summary_dir+run_name)
 
@@ -508,9 +508,14 @@ def parse_args():
 
 if __name__ == '__main__':
 
-    train_images_path_pattern = '../cityscapes/data/leftImg8bit/train/*/*_leftImg8bit.png'
-    train_labels_path_pattern = '../cityscapes/data/gtFine/train/*/*_gtFine_labelTrainIds.png'
-    test_images_path_pattern = '../cityscapes/data/leftImg8bit/test/*/*.png'
+    if dataset == "cityscapes":
+        train_images_path_pattern = '../cityscapes/data/leftImg8bit/train/*/*_leftImg8bit.png'
+        train_labels_path_pattern = '../cityscapes/data/gtFine/train/*/*_gtFine_labelTrainIds.png'
+        test_images_path_pattern  = '../cityscapes/data/leftImg8bit/test/*/*.png'
+    elif dataset == "mapillary":
+        train_images_path_pattern = '../mapillary/data/train/*_image.png'
+        train_labels_path_pattern = '../mapillary/data/train/*_gt.png'
+        test_images_path_pattern  = '../mapillary/data/train/*_image.png'  # TODO
 
     args = parse_args()
 
