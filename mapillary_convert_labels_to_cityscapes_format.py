@@ -29,6 +29,10 @@ def change_color(fromimage, toimage, fromcolor, tocolor):
     # r2, g2, b2 = tocolor    # Value that we want to replace it with
     # toimage[:,:,:3][mask] = [r2, g2, b2]
     return np.sum(mask)
+    
+def find_horizon(image):
+    print(len(np.sum(image, axis=1))
+    return
 
 
 image_paths = glob.glob(images_path_pattern)
@@ -53,6 +57,7 @@ for i, image_file in enumerate(image_paths):
     h = gt_image.shape[0]
     w = gt_image.shape[1]
     ratio = w/h
+    find_horizon(image)
     if ratio > desired_ratio:
         tocrop = int((w - h * desired_ratio) / 2)
         w = w - 2 * tocrop
