@@ -25,6 +25,8 @@ verbose = False
 desired_h = 1024
 desired_w = 2048
 desired_ratio = desired_w / desired_h
+desired_top_crop_ratio = 0.66  # 1 = crop only top, 0 = crop only bottom, 0.5 = equal
+assert desired_top_crop_ratio <= 1.0 and desired_top_crop_ratio >= 0.0
 
 
 def change_color(fromimage, toimage, fromcolor, tocolor):
@@ -62,7 +64,7 @@ processing_times = deque([], maxlen=5)
 
 for i, image_file in enumerate(image_paths):
     start_time = time.time()
-    
+
     # Output filenames
     output_image_file = os.path.splitext(image_file)[0] + '_image.png'
     gt_image_file = label_paths[os.path.basename(image_file)]
@@ -72,7 +74,7 @@ for i, image_file in enumerate(image_paths):
     # Read images
     image = scipy.misc.imread(image_file)
     gt_image = scipy.misc.imread(gt_image_file)
-    
+
     print("({}/{}) Processing {} ({})...".format(i+1, len(image_paths), gt_image_file, gt_image.shape))
 
     # Crop both image and gt to be the desired_ratio
@@ -81,17 +83,19 @@ for i, image_file in enumerate(image_paths):
     ratio = w/h
     # find_horizon(image, output_stats_file)
     if ratio > desired_ratio:
-        tocrop = int((w - h * desired_ratio) / 2)
-        w = w - 2 * tocrop
+        tocrop = int(w - h * desired_ratio)
+        tocrop_left = int(0.5 * tocrop)
+        w = w - tocrop
         #print("Need to crop horizontally, {}px per side".format(tocrop))
-        image    =    image[0:h, tocrop:tocrop+w]
-        gt_image = gt_image[0:h, tocrop:tocrop+w]
+        image    =    image[0:h, tocrop_left:tocrop_left+w]
+        gt_image = gt_image[0:h, tocrop_left:tocrop_left+w]
     elif ratio < desired_ratio:
-        tocrop = int((h - w / desired_ratio) / 2)
-        h = h - 2 * tocrop
+        tocrop = int(h - w / desired_ratio)
+        tocrop_top = int(desired_top_crop_ratio * tocrop)
+        h = h - tocrop
         #print("Need to crop vertically, {}px per side".format(tocrop))
-        image    =    image[tocrop:tocrop+h, 0:w]
-        gt_image = gt_image[tocrop:tocrop+h, 0:w]
+        image    =    image[tocrop_top:tocrop_top+h, 0:w]
+        gt_image = gt_image[tocrop_top:tocrop_top+h, 0:w]
     else:
         pass
         #print("NO need to crop")
@@ -127,7 +131,7 @@ for i, image_file in enumerate(image_paths):
     check = scipy.misc.imread(output_gt_image_file)
     assert np.max(gt_image_bw) == np.max(check)
     """
-    
+
     # Compute processing duration
     duration = time.time() - start_time
     processing_times.append(duration)
