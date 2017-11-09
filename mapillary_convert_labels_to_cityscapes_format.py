@@ -113,7 +113,7 @@ for i, image_file in enumerate(image_paths):
     # Scroll through all possible labels and paint the output accordingly
     num_classes = len(mapillary_labels.labels)
     for c in range(num_classes):
-        fromcolor = mapillary_labels.labels[c].color
+        fromcolor = mapillary_labels.labels[c].color_prepr
         tocolor = mapillary_labels.labels[c].trainId
         n_changed_px = change_color(gt_image_res, gt_image_bw, fromcolor, tocolor)
         if verbose:
