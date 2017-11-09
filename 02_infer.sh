@@ -20,7 +20,11 @@
 
 
 # Urban Cologne videos
-TRAINING="Training_A"
+# TRAINING="Training_A"
+TRAINING="Training_test_mapillary"
+IMAGES=1
+VIDEO=0
+
 MASTERVIDEOFOLDER="20171103_DrivePX_City"
 VIDEOFOLDER="dw_20171102_181952_0.000000_0.000000"
 # VIDEONAME="video_1.h264_undist"
@@ -30,9 +34,19 @@ EXTENSION="mp4"
 SUFFIX="_segmented"
 VIDEOFILEINPUT=$VIDEONAME.$EXTENSION
 VIDEOFILEOUTPUT=$VIDEONAME$SUFFIX.$EXTENSION
-echo "Processing $VIDEOFILEINPUT --> $VIDEOFILEOUTPUT"
 
 python main.py freeze --ckpt_dir=ckpt/$TRAINING --frozen_model_dir=frozen_model
 python main.py optimise --frozen_model_dir=frozen_model --optimised_model_dir=optimised_model
-python main.py video --gpu=1 --xla=2 --model_dir=optimised_model --video_file_in=../videos/$MASTERVIDEOFOLDER/$VIDEOFOLDER/$VIDEOFILEINPUT --video_file_out=../videos/$MASTERVIDEOFOLDER/$VIDEOFOLDER/$VIDEOFILEOUTPUT
+
+if [ $IMAGES -eq 1 ]
+then
+  echo "Processing images in the test set"
+  python main.py predict --gpu=1 --xla=2 --model_dir=optimised_model
+fi
+
+if [ $VIDEO -eq 1 ]
+then
+  echo "Processing $VIDEOFILEINPUT --> $VIDEOFILEOUTPUT"
+  python main.py video --gpu=1 --xla=2 --model_dir=optimised_model --video_file_in=../videos/$MASTERVIDEOFOLDER/$VIDEOFOLDER/$VIDEOFILEINPUT --video_file_out=../videos/$MASTERVIDEOFOLDER/$VIDEOFOLDER/$VIDEOFILEOUTPUT
+fi
 

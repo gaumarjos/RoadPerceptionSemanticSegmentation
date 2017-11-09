@@ -33,8 +33,8 @@ import helper
 import fcn8vgg16
 import camera_calibration
 
-dataset = "cityscapes"
-# dataset = "mapillary"
+# dataset = "cityscapes"
+dataset = "mapillary"
 if dataset == "cityscapes":
     import cityscape_labels as dataset_labels
 elif dataset == "mapillary":
@@ -78,8 +78,12 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
     :return:
     """
     image_paths = glob.glob(images_path_pattern)
-    label_paths = {re.sub('_gtFine_labelTrainIds', '_leftImg8bit', os.path.basename(path)): path
-                        for path in glob.glob(labels_path_pattern)}
+    if dataset == "cityscapes":
+        label_paths = {re.sub('_gtFine_labelTrainIds', '_leftImg8bit', os.path.basename(path)): path
+                            for path in glob.glob(labels_path_pattern)}
+    if dataset == "mapillary":
+        label_paths = {re.sub('_gt', '_image', os.path.basename(path)): path
+                            for path in glob.glob(labels_path_pattern)}
     num_classes = len(dataset_labels.labels)
     num_samples = len(image_paths)
     assert len(image_paths) == len(label_paths)
