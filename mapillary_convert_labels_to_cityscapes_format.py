@@ -9,10 +9,8 @@ import warnings
 from distutils.version import LooseVersion
 import shutil
 import time
-import argparse
 import glob
-import cityscape_labels
-from skimage import io, exposure, img_as_uint, img_as_float
+import mapillary_labels
 import cv2
 
 images_path_pattern = '../mapillary/data/train/*.jpg'
@@ -30,7 +28,7 @@ def change_color(fromimage, toimage, fromcolor, tocolor):
     toimage[mask] = tocolor
     # r2, g2, b2 = tocolor    # Value that we want to replace it with
     # toimage[:,:,:3][mask] = [r2, g2, b2]
-    return
+    return np.sum(mask)
 
 
 image_paths = glob.glob(images_path_pattern)
@@ -70,7 +68,7 @@ for i, image_file in enumerate(image_paths):
     else:
         pass
         #print("NO need to crop")
-    #print(image.shape)    
+    #print(image.shape)
     #print(gt_image.shape)
 
     # Resize it to be desired_h * desired_w
@@ -81,12 +79,15 @@ for i, image_file in enumerate(image_paths):
     gt_image_bw = np.zeros((gt_image_res.shape[0], gt_image_res.shape[1]), dtype=np.uint8)
 
     # Scroll through all possible labels and paint the output accordingly
-    num_classes = len(cityscape_labels.labels)
+    num_classes = len(mapillary_labels.labels)
     for i in range(num_classes):
-        # print("    " + cityscape_labels.labels[i].name)
-        fromcolor = cityscape_labels.labels[i].color
-        tocolor = cityscape_labels.labels[i].trainId
-        change_color(gt_image_res, gt_image_bw, fromcolor, tocolor)
+        fromcolor = mapillary_labels.labels[i].color
+        tocolor = mapillary_labels.labels[i].trainId
+        n_changed_px = change_color(gt_image_res, gt_image_bw, fromcolor, tocolor)
+        print("    ({:5.2f}%)    RGB {:3}, {:3}, {:3} --> LABEL {:3}    {}".format(n_changed_px/gt_image_bw.size*100,
+                                                                            fromcolor[0], fromcolor[1], fromcolor[2],
+                                                                            tocolor,
+                                                                            mapillary_labels.labels[i].name))
 
     # Save both the resized image and the gt image with B/W labelling
     scipy.misc.imsave(output_image_file, image_res)
@@ -98,5 +99,5 @@ for i, image_file in enumerate(image_paths):
     
     # Compute processing duration
     duration = time.time() - start_time
-    print("Duration: {}s".format(duration))
+    print("Duration: {:4.1f}s".format(duration))
 
