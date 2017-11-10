@@ -82,13 +82,14 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
         label_paths = {re.sub('_gtFine_labelTrainIds', '_leftImg8bit', os.path.basename(path)): path
                             for path in glob.glob(labels_path_pattern)}
     if dataset == "mapillary":
-        label_paths = {re.sub('_cropped', '_cropped', os.path.basename(path)): path  # TODO Not sure if this one will work (I hate this way convoluted way of coding!)
+        label_paths = {re.sub('_cropped', '_cropped', os.path.basename(path)): path
                             for path in glob.glob(labels_path_pattern)}
     num_classes = len(dataset_labels.labels)
     num_samples = len(image_paths)
     assert len(image_paths) == len(label_paths)
     
-    print("Number of samples used in training: {}".format(num_samples))
+    print("num_classes={}".format(num_classes))
+    print("num_samples={}".format(num_samples))
 
     def get_batches_fn(batch_size):
         """
@@ -107,6 +108,12 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
 
                 image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)         # 256x512x3
                 gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)   # 256*512*1, the value is the label
+
+                """
+                print()
+                print("Image used: {}".format(image_file))
+                print("Label used: {}".format(gt_image_file))
+                """
 
                 """
                 # https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
@@ -467,7 +474,7 @@ def get_colors():
     colors = {}
     transparency_level = 128
     for label in range(num_classes):
-        color = dataset_labels.trainId2label[label].color
+        color = tuple(dataset_labels.trainId2label[label].color)
         colors[label] = np.array([color + (transparency_level,)], dtype=np.uint8)
     return colors
 
