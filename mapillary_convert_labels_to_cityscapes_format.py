@@ -1,43 +1,40 @@
-import scipy
-import scipy.misc
 import numpy as np
-from PIL import Image
 import os.path
 import re
 import os
-import warnings
-from distutils.version import LooseVersion
-import shutil
 import time
 import glob
-import mapillary_labels
 import cv2
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
-from pylab import *              # Matplotlib's pylab interface
 from collections import deque
+import mapillary_labels
 
 
-def change_color(fromimage, toimage, fromcolor, tocolor):
-    r1, g1, b1 = fromcolor  # Original value
-    red, green, blue = fromimage[:,:,0], fromimage[:,:,1], fromimage[:,:,2]
-    mask = (red == r1) & (green == g1) & (blue == b1)
-    toimage[mask] = tocolor
-    # r2, g2, b2 = tocolor    # Value that we want to replace it with
-    # toimage[:,:,:3][mask] = [r2, g2, b2]
-    return np.sum(mask)
+def apply_id(labelled_image):
+    r, g, b = labelled_image[:,:,2], labelled_image[:,:,1], labelled_image[:,:,0]  # Untested, just make sure you use BGR is loading images with cv2
+    bw_image = np.zeros((labelled_image.shape[0], labelled_image.shape[1]), dtype=np.uint8)
+    for label_id, label in enumerate(mapillary_labels.labels):
+        r1, g1, b1 = label.color_prepr
+        mask = (r == r1) & (g == g1) & (b == b1)
+        bw_image[mask] = label.trainId
+        if 0:
+            print("    RGB {:3}, {:3}, {:3} --> LABEL {:3}    {}".format(r1, g1, b1,
+                                                                         label.trainId,
+                                                                         label.name))
+    return bw_image
 
 
-def process_folder(images_input_path_pattern, labels_input_path,
-                   images_output_path, labels_output_path):
+def process_folder(images_input_path_pattern,  # where to find the images
+                   instances_input_path,       # where to find the b/w instances
+                   images_output_path,         # where to save the processed images
+                   instances_output_path):     # where to save the b/w processed instances
 
     # Find images to convert (start from the images and then check if the corresponding instance exists)
     image_paths = glob.glob(images_input_path_pattern)
-    label_paths = []
+    instance_paths = []
     for path in image_paths:
-        proposed = labels_input_path + os.path.splitext(os.path.basename(path))[0] + ".png"
+        proposed = instances_input_path + os.path.splitext(os.path.basename(path))[0] + ".png"
         assert os.path.isfile(proposed)
-        label_paths.append(proposed)
+        instance_paths.append(proposed)
 
     # Used to estimate the remaining time
     processing_times = deque([], maxlen=10)
@@ -46,31 +43,29 @@ def process_folder(images_input_path_pattern, labels_input_path,
         start_time = time.time()
 
         # Input/output filenames
-        gt_image_file = label_paths[i]
-        output_image_file = images_output_path + os.path.splitext(os.path.basename(image_file))[0] + '_cropped.png'
-        output_gt_image_file = labels_output_path + os.path.splitext(os.path.basename(image_file))[0] + '_cropped.png'
+        instance_file = instance_paths[i]
+        output_image_file = images_output_path + os.path.splitext(os.path.basename(image_file))[0] + '_image.png'
+        output_instance_file = instances_output_path + os.path.splitext(os.path.basename(image_file))[0] + '_instance.png'
 
         # Check if these output files already exists
-        image_processed_exists = os.path.isfile(output_image_file)
-        gt_image_processed_exists = os.path.isfile(output_gt_image_file)
-        if image_processed_exists and gt_image_processed_exists:
+        if os.path.isfile(output_image_file) and os.path.isfile(output_instance_file):
             print("({}/{}) Pair {} - {} already exists, skip.".format(i+1, len(image_paths),
                                                                       output_image_file,
-                                                                      output_gt_image_file))
+                                                                      output_instance_file))
 
         else:
             # Read images
-            image = scipy.misc.imread(image_file)
-            gt_image = scipy.misc.imread(gt_image_file)
-            assert image.shape[0] == gt_image.shape[0] and image.shape[1] == gt_image.shape[1] and image.shape[2] == 3
+            image = cv2.imread(image_file)
+            instance = cv2.imread(instance_file)
+            assert image.shape[0] == instance.shape[0] and image.shape[1] == instance.shape[1] and image.shape[2] == 3
 
             print("({}/{}) Processing the pair {} ({}) - {} ({})...".format(i+1, len(image_paths),
                                                                             image_file, image.shape,
-                                                                            gt_image_file, gt_image.shape))
+                                                                            instance_file, instance.shape))
 
             # Crop both image and gt to be the desired_ratio
-            h = gt_image.shape[0]
-            w = gt_image.shape[1]
+            h = image.shape[0]
+            w = image.shape[1]
             ratio = w/h
             # find_horizon(image, output_stats_file)
             if ratio > desired_ratio:
@@ -78,48 +73,35 @@ def process_folder(images_input_path_pattern, labels_input_path,
                 tocrop_left = int(0.5 * tocrop)
                 w = w - tocrop
                 #print("Need to crop horizontally, {}px per side".format(tocrop))
-                image    =    image[0:h, tocrop_left:tocrop_left+w]
-                gt_image = gt_image[0:h, tocrop_left:tocrop_left+w]
+                image = image[0:h, tocrop_left:tocrop_left+w]
+                instance = instance[0:h, tocrop_left:tocrop_left+w]
             elif ratio < desired_ratio:
                 tocrop = int(h - w / desired_ratio)
                 tocrop_top = int(desired_top_crop_ratio * tocrop)
                 h = h - tocrop
                 #print("Need to crop vertically, {}px per side".format(tocrop))
-                image    =    image[tocrop_top:tocrop_top+h, 0:w]
-                gt_image = gt_image[tocrop_top:tocrop_top+h, 0:w]
+                image = image[tocrop_top:tocrop_top+h, 0:w]
+                instance = instance[tocrop_top:tocrop_top+h, 0:w]
             else:
                 pass
                 #print("No need to crop")
-            #print(image.shape)
-            #print(gt_image.shape)
 
             # Resize it to be desired_h * desired_w
             image_res = cv2.resize(image, (desired_w, desired_h), interpolation=cv2.INTER_NEAREST)
-            gt_image_res = cv2.resize(gt_image, (desired_w, desired_h), interpolation=cv2.INTER_NEAREST)
+            instance_res = cv2.resize(instance, (desired_w, desired_h), interpolation=cv2.INTER_NEAREST)
+            #image_res = image
+            #instance_res = instance
 
-            # Make sure the color image is 8 bit
+            # Create instance --> not used as we're working directly with instances
+            # instance_res = apply_id(label_res)
+
+            # Make sure they're 8 bit
             image_res = image_res.astype(dtype=np.uint8)
-            gt_image_res = gt_image_res.astype(dtype=np.uint8)
-            
-            """
-            verbose = False
-            # Scroll through all possible labels and paint the output accordingly
-            gt_image_bw = np.zeros((gt_image_res.shape[0], gt_image_res.shape[1]), dtype=np.uint8)
-            num_classes = len(mapillary_labels.labels)
-            for c in range(num_classes):
-                fromcolor = mapillary_labels.labels[c].color_prepr
-                tocolor = mapillary_labels.labels[c].trainId
-                n_changed_px = change_color(gt_image_res, gt_image_bw, fromcolor, tocolor)
-                if verbose:
-                    print("    ({:5.2f}%)    RGB {:3}, {:3}, {:3} --> LABEL {:3}    {}".format(n_changed_px/gt_image_bw.size*100,
-                                                                                        fromcolor[0], fromcolor[1], fromcolor[2],
-                                                                                        tocolor,
-                                                                                        mapillary_labels.labels[i].name))
-            """
+            instance_res = instance_res.astype(dtype=np.uint8)
 
             # Save both the resized image and the gt image with B/W labelling
-            scipy.misc.imsave(output_image_file, image_res)
-            scipy.misc.imsave(output_gt_image_file, gt_image_res)
+            cv2.imwrite(output_image_file, image_res)
+            cv2.imwrite(output_instance_file, instance_res)
 
             # Compute processing duration
             duration = time.time() - start_time
@@ -132,16 +114,20 @@ def process_folder(images_input_path_pattern, labels_input_path,
 
 
 if __name__ == '__main__':
-    desired_h = 1024
-    desired_w = 2048
+    #desired_h = 1024
+    #desired_w = 2048
+    desired_h = 256
+    desired_w = 512
     desired_ratio = desired_w / desired_h
     desired_top_crop_ratio = 0.66  # 1 = crop only top, 0 = crop only bottom, 0.5 = equal
     assert desired_top_crop_ratio <= 1.0 and desired_top_crop_ratio >= 0.0
 
     images_input_path_pattern = '../mapillary/data/training/images/*.jpg'
-    labels_input_path = '../mapillary/data/training/instances/'
+    instances_input_path = '../mapillary/data/training/instances/'
     images_output_path = '../mapillary/data/training/images_processed/'
-    labels_output_path = '../mapillary/data/training/instances_processed/'
-    process_folder(images_input_path_pattern, labels_input_path,
-                   images_output_path, labels_output_path)
+    instances_output_path = '../mapillary/data/training/instances_processed/'
+    process_folder(images_input_path_pattern,
+                   instances_input_path,
+                   images_output_path,
+                   instances_output_path)
 
