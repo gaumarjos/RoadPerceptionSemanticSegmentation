@@ -82,7 +82,7 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
         label_paths = {re.sub('_gtFine_labelTrainIds', '_leftImg8bit', os.path.basename(path)): path
                             for path in glob.glob(labels_path_pattern)}
     if dataset == "mapillary":
-        label_paths = {re.sub('_gt', '_image', os.path.basename(path)): path
+        label_paths = {re.sub('_cropped', '_cropped', os.path.basename(path)): path  # TODO Not sure if this one will work (I hate this way convoluted way of coding!)
                             for path in glob.glob(labels_path_pattern)}
     num_classes = len(dataset_labels.labels)
     num_samples = len(image_paths)
@@ -110,11 +110,6 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
 
                 """
                 # https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
-                # Augmentation by flipping --> not sure this helps, because traffic data are naturally quite uniform left and right and flipping introduces traffic signs, for example, that don't exist in reality
-                flip_prob = random.random()
-                if flip_prob > 0.5:
-                    image = cv2.flip(image, 1)
-                    gt_image = cv2.flip(gt_image, 1)
 
                 # Augmentation by translating vertically --> it looked like a smart idea but the result is rather rubbish...
                 tx = 0
@@ -530,9 +525,9 @@ if __name__ == '__main__':
         train_labels_path_pattern = '../cityscapes/data/gtFine/train/*/*_gtFine_labelTrainIds.png'
         test_images_path_pattern  = '../cityscapes/data/leftImg8bit/test/*/*.png'
     elif dataset == "mapillary":
-        train_images_path_pattern = '../mapillary/data/train/*_image.png'
-        train_labels_path_pattern = '../mapillary/data/train/*_gt.png'
-        test_images_path_pattern  = '../mapillary/data/train/*_image.png'  # TODO
+        train_images_path_pattern = '../mapillary/data/training/images_processed_subset/*_cropped.png'
+        train_labels_path_pattern = '../mapillary/data/training/instances_processed_subset/*_cropped.png'
+        test_images_path_pattern  = '../mapillary/data/testing/*.jpg'  # Keep in mind these have all different sizes
 
     # This enables a faster (but slightly uglier, less saturated) code to paint on the output images and videos.
     # The idea is to disable it when preparing images and videos for presentations.
