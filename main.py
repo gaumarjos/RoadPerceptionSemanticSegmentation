@@ -69,7 +69,7 @@ def load_trained_vgg_vars(sess):
     return var_values
 
 
-def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_pattern, image_shape):
+def get_train_batch_generator(images_path_pattern, labels_path_pattern, image_shape):
     """
     Generate function to create batches of training data
     :param images_path_pattern: path pattern for images
@@ -81,8 +81,8 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
     if dataset == "cityscapes":
         label_paths = {re.sub('_gtFine_labelTrainIds', '_leftImg8bit', os.path.basename(path)): path
                             for path in glob.glob(labels_path_pattern)}
-    if dataset == "mapillary":
-        label_paths = {re.sub('_cropped', '_cropped', os.path.basename(path)): path
+    elif dataset == "mapillary":
+        label_paths = {re.sub('_instance', '_image', os.path.basename(path)): path
                             for path in glob.glob(labels_path_pattern)}
     num_classes = len(dataset_labels.labels)
     num_samples = len(image_paths)
@@ -90,6 +90,36 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
     
     print("num_classes={}".format(num_classes))
     print("num_samples={}".format(num_samples))
+
+    """
+    # Original version, for reference
+     def get_batches_fn(batch_size):
+        random.shuffle(image_paths)
+        count = 0
+        for batch_i in range(0, num_samples, batch_size):
+            images = []
+            gt_images = []
+            for image_file in image_paths[batch_i:batch_i+batch_size]:
+                gt_image_file = label_paths[os.path.basename(image_file)]
+
+                image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
+                gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)
+
+                gt_image = gt_image.reshape(*gt_image.shape, 1)
+                tmp = []
+                for label in range(num_classes):
+                  color = np.array([label, label, label])
+                  gt_bg = np.all(gt_image == color, axis=2)
+                  gt_bg = gt_bg.reshape(*gt_bg.shape, 1)
+                  tmp.append(gt_bg)
+                gt_image = np.concatenate(tmp, axis=2)
+
+                images.append(image)
+                gt_images.append(gt_image)
+                count += 1
+
+            yield np.array(images), np.array(gt_images)
+    """
 
     def get_batches_fn(batch_size):
         """
@@ -103,17 +133,21 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
             images = []
             gt_images = []
             for image_file in image_paths[batch_i:batch_i+batch_size]:
-                start_time = time.time()
+                # start_time = time.time()
                 gt_image_file = label_paths[os.path.basename(image_file)]
 
-                image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)         # 256x512x3
-                gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)   # 256*512*1, the value is the label
+                image = scipy.misc.imread(image_file)
+                gt_image = scipy.misc.imread(gt_image_file)
 
-                """
-                print()
-                print("Image used: {}".format(image_file))
-                print("Label used: {}".format(gt_image_file))
-                """
+                # If gt_image has 3 channels instead of the necessary 1, just remove the others, it's BW anyway
+                if len(gt_image.shape) > 2:
+                    gt_image = gt_image[:,:,0]
+
+                # Resize images only if necessary
+                if image.shape[0] != image_shape[0] or image.shape[1] != image_shape[1]:
+                    image = scipy.misc.imresize(image, image_shape)                         # 256x512x3
+                if gt_image.shape[0] != image_shape[0] or gt_image.shape[1] != image_shape[1]:
+                    gt_image = scipy.misc.imresize(gt_image, image_shape)                   # 256*512*1, the value is the label
 
                 """
                 # https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
@@ -131,14 +165,16 @@ def get_train_batch_generator_cityscapes(images_path_pattern, labels_path_patter
                 gt_image = gt_image.reshape(*gt_image.shape, 1)
                 tmp = []
                 for label in range(num_classes):
-                  color = np.array([label, label, label])
-                  gt_bg = np.all(gt_image == color, axis=2)
-                  gt_bg = gt_bg.reshape(*gt_bg.shape, 1)
-                  tmp.append(gt_bg)
+                    # STE: I commented these two lines cos they're unnecessarily slow and "color" has dimension 1, not 3
+                    # color = np.array([label, label, label])
+                    # gt_bg = np.all(gt_image == color, axis=2)
+                    gt_bg = np.all(gt_image == label, axis=2)
+                    gt_bg = gt_bg.reshape(*gt_bg.shape, 1)
+                    tmp.append(gt_bg)
                 gt_image = np.concatenate(tmp, axis=2)
 
-                duration = time.time() - start_time
-                #print('Pre-processing time per image: {}'.format(duration))
+                # duration = time.time() - start_time
+                # print('Pre-processing time per image: {}'.format(duration))
 
                 images.append(image)
                 gt_images.append(gt_image)
@@ -166,15 +202,9 @@ def train(args, image_shape):
         model.restore_variables(sess, var_values)
         
         # Create batch generator
-        train_batches_fn, num_samples = get_train_batch_generator_cityscapes(args.images_paths,
-                                                                             args.labels_paths,
-                                                                             image_shape)
-        """
-        # The following lines needs to be changed to use validation data data instead of train data. The reason I'm now using train data is to see if the results are comparable.
-        val_batches_fn, val_num_samples = get_train_batch_generator_cityscapes(args.images_paths,
-                                                                               args.labels_paths,
-                                                                               image_shape)
-        """
+        train_batches_fn, num_samples = get_train_batch_generator(args.images_paths,
+                                                                  args.labels_paths,
+                                                                  image_shape)
         time_str = time.strftime("%Y%m%d_%H%M%S")
         run_name = "/{}_ep{}_b{}_lr{:.6f}_kp{}".format(time_str, args.epochs, args.batch_size, args.learning_rate, args.keep_prob)
         start_time = time.time()
@@ -528,12 +558,12 @@ def parse_args():
 if __name__ == '__main__':
 
     if dataset == "cityscapes":
-        train_images_path_pattern = '../cityscapes/data/leftImg8bit/train/*/*_leftImg8bit.png'
-        train_labels_path_pattern = '../cityscapes/data/gtFine/train/*/*_gtFine_labelTrainIds.png'
-        test_images_path_pattern  = '../cityscapes/data/leftImg8bit/test/*/*.png'
+        train_images_path_pattern = '/home/ele_16/Documents/CarND/ste/cityscapes/data/leftImg8bit/train/*/*_leftImg8bit.png'
+        train_labels_path_pattern = '/home/ele_16/Documents/CarND/ste/cityscapes/data/gtFine/train/*/*_gtFine_labelTrainIds.png'
+        test_images_path_pattern  = '/home/ele_16/Documents/CarND/ste/cityscapes/data/leftImg8bit/test/*/*.png'
     elif dataset == "mapillary":
-        train_images_path_pattern = '../mapillary/data/training/images_processed_subset/*_cropped.png'
-        train_labels_path_pattern = '../mapillary/data/training/instances_processed_subset/*_cropped.png'
+        train_images_path_pattern = '../mapillary/data/training/images_processed_subset/*_image.png'
+        train_labels_path_pattern = '../mapillary/data/training/instances_processed_subset/*_instance.png'
         test_images_path_pattern  = '../mapillary/data/testing/*.jpg'  # Keep in mind these have all different sizes
 
     # This enables a faster (but slightly uglier, less saturated) code to paint on the output images and videos.
