@@ -70,7 +70,6 @@ class FCN8_VGG16:
     def train(self, sess,
               epochs, batch_size,
               get_batches_fn, n_samples,
-              # get_val_batches_fn, val_n_samples,  # Added to include validation, not used at the moment
               keep_prob_value, learning_rate,
               ckpt_dir=None, summaries_dir=None):
         """

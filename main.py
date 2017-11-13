@@ -562,8 +562,8 @@ if __name__ == '__main__':
         train_labels_path_pattern = '/home/ele_16/Documents/CarND/ste/cityscapes/data/gtFine/train/*/*_gtFine_labelTrainIds.png'
         test_images_path_pattern  = '/home/ele_16/Documents/CarND/ste/cityscapes/data/leftImg8bit/test/*/*.png'
     elif dataset == "mapillary":
-        train_images_path_pattern = '../mapillary/data/training/images_processed_subset/*_image.png'
-        train_labels_path_pattern = '../mapillary/data/training/instances_processed_subset/*_instance.png'
+        train_images_path_pattern = '../mapillary/data/training/images_processed_256x512/*_image.png'
+        train_labels_path_pattern = '../mapillary/data/training/instances_processed_256x512/*_instance.png'
         test_images_path_pattern  = '../mapillary/data/testing/*.jpg'  # Keep in mind these have all different sizes
 
     # This enables a faster (but slightly uglier, less saturated) code to paint on the output images and videos.
