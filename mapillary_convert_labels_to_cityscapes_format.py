@@ -114,18 +114,20 @@ def process_folder(images_input_path_pattern,  # where to find the images
 
 
 if __name__ == '__main__':
-    #desired_h = 1024
-    #desired_w = 2048
-    desired_h = 256
-    desired_w = 512
+    desired_h = 1024
+    desired_w = 2048
+    #desired_h = 256
+    #desired_w = 512
     desired_ratio = desired_w / desired_h
     desired_top_crop_ratio = 0.66  # 1 = crop only top, 0 = crop only bottom, 0.5 = equal
     assert desired_top_crop_ratio <= 1.0 and desired_top_crop_ratio >= 0.0
 
     images_input_path_pattern = '../mapillary/data/training/images/*.jpg'
     instances_input_path = '../mapillary/data/training/instances/'
-    images_output_path = '../mapillary/data/training/images_processed/'
-    instances_output_path = '../mapillary/data/training/instances_processed/'
+    images_output_path = '../mapillary/data/training/images_processed_1024x2048/'
+    instances_output_path = '../mapillary/data/training/instances_processed_1024x2048/'
+    #images_output_path = '../mapillary/data/training/images_processed_256x512/'
+    #instances_output_path = '../mapillary/data/training/instances_processed_256x512/'
     process_folder(images_input_path_pattern,
                    instances_input_path,
                    images_output_path,
