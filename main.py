@@ -23,6 +23,9 @@ import pickle
 import cv2
 
 import tensorflow as tf
+from tensorflow.contrib.data import Dataset, Iterator
+from tensorflow.python.framework import ops
+from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import graph_util as tf_graph_util
 from tqdm import tqdm
 import scipy.misc
@@ -185,13 +188,69 @@ def get_train_batch_generator(images_path_pattern, labels_path_pattern, image_sh
 
 
 def train(args, image_shape):
+    # DOCUMENTATION
+    # https://www.tensorflow.org/api_docs/python/tf/train/batch
+    # https://www.tensorflow.org/programmers_guide/datasets
+
     config = session_config(args)
-    
+
     # extract pre-trained VGG weights
     with tf.Session(config=config) as sess:
         var_values = load_trained_vgg_vars(sess)
     tf.reset_default_graph()
+
+    # Load paths and images in memory (they're only string, there's space)
+    images_path_pattern = args.images_paths
+    labels_path_pattern = args.labels_paths                                              
+    image_paths = glob.glob(images_path_pattern)
+    if dataset == "cityscapes":
+        label_paths_tmp = {re.sub('_gtFine_labelTrainIds', '_leftImg8bit', os.path.basename(path)): path
+                            for path in glob.glob(labels_path_pattern)}
+    elif dataset == "mapillary":
+        label_paths_tmp = {re.sub('_instance', '_image', os.path.basename(path)): path
+                            for path in glob.glob(labels_path_pattern)}
+    num_classes = len(dataset_labels.labels)
+    num_samples = len(image_paths)
+    assert len(image_paths) == len(label_paths_tmp)
+
+    print("num_classes={}".format(num_classes))
+    print("num_samples={}".format(num_samples))
+
+    label_paths = []
+    for image_file in image_paths:
+        label_paths.append(label_paths_tmp[os.path.basename(image_file)])
+        # Now we have a list of image_paths and one of label_paths
+
+    # Convert string into tensors
+    all_images = ops.convert_to_tensor(image_paths, dtype=dtypes.string)
+    all_labels = ops.convert_to_tensor(label_paths, dtype=dtypes.string)
+
+    # Create input queues
+    train_input_queue = tf.train.slice_input_producer([all_images, all_labels],
+                                                      shuffle=False)
+
+    # Process path and string tensor into an image and a label
+    file_content = tf.read_file(train_input_queue[0])
+    train_image = tf.image.decode_png(file_content, channels=3)
+    train_label = tf.image.decode_png(file_content, channels=1)
+
+    # Define tensor shape
+    train_image.set_shape([256, 512, 3])
+    train_label.set_shape([256, 512, 1])
     
+    # One hot on the label
+    train_label_one_hot = tf.one_hot(train_label, num_classes)
+
+    # Collect batches of images before processing
+    train_image_batch, train_label_batch = tf.train.batch([train_image, train_label_one_hot],
+                                                           batch_size=10,
+                                                           allow_smaller_final_batch=True
+                                                           #,num_threads=1
+                                                           )
+
+
+
+    # TF session
     with tf.Session(config=config) as sess:
         # define our FCN
         num_classes = len(dataset_labels.labels)
@@ -200,6 +259,49 @@ def train(args, image_shape):
         # variables initialization
         sess.run(tf.global_variables_initializer())
         model.restore_variables(sess, var_values)
+
+        # initialize the queue threads to start to shovel data
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(coord=coord)
+        
+        # Details for saving
+        time_str = time.strftime("%Y%m%d_%H%M%S")
+        run_name = "/{}_ep{}_b{}_lr{:.6f}_kp{}".format(time_str, args.epochs, args.batch_size, args.learning_rate, args.keep_prob)
+        start_time = time.time()
+
+        print("from the train set:")
+        for i in range(20):
+            pippo = sess.run(train_label_batch)
+            print(pippo[0].shape)
+
+
+
+
+
+        # stop our queue threads and properly close the session
+        coord.request_stop()
+        coord.join(threads)
+        sess.close()
+        
+        
+        
+        """
+    # Create TensorFlow Dataset objects
+    tf_dataset = Dataset.from_tensor_slices((tf_image_paths, tf_gt_image_paths))
+
+    # Create TensorFlow Iterator object
+    iterator = Iterator.from_structure(tf_dataset.output_types,
+                                       tf_dataset.output_shapes)
+    next_element = iterator.get_next()
+
+    # create two initialization ops to switch between the datasets
+    init_op = iterator.make_initializer(tf_dataset)
+"""
+        
+        
+        
+        """
+        
         
         # Create batch generator
         train_batches_fn, num_samples = get_train_batch_generator(args.images_paths,
@@ -235,13 +337,24 @@ def train(args, image_shape):
             f.write('total_time_hrs={}\n'.format(duration/3600))
 
         # save model
-        """ save trained model using SavedModelBuilder """
         if args.model_dir is None:
             model_dir = os.path.join(output_dir, 'model')
         else:
             model_dir = args.model_dir
         print('saving trained model to {}'.format(model_dir))
         model.save_model(sess, model_dir)
+        """
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
 
 
 def predict_image(sess, model, image, colors_dict):

@@ -153,28 +153,6 @@ class FCN8_VGG16:
             l /= n_samples
             # batches_pbar.set_description("loss over last epoch {}".format(l))
 
-            # Validation code starts (to be debugged)
-            # The code works without errors but for some reason running the validation on the same training dataset doesn't produce the same result as the train operation just above.
-            """
-            val_n = 0.
-            val_l = 0.
-            for images, labels in val_batches_pbar:
-                feed_dict = {self._images: images,
-                             self._labels: labels,
-                             self._keep_prob: 1.0}
-                val_loss, val_summaries, _, _ = sess.run([self._loss,
-                                                          self._summaries,
-                                                          self._prediction_class_idx,
-                                                          self._batch_mean_iou],
-                                                         feed_dict=feed_dict)
-                val_n += len(images)
-                val_l += val_loss * len(images)
-                val_batches_pbar.set_description(
-                    'Validation Epoch {:>2}/{} (loss {:.3f})'.format(epoch + 1, epochs, val_l / val_n))
-            val_l /= n_samples
-            """
-            # Validation code ends
-
             if saver is not None:
                 save_path = saver.save(sess, checkpoint_dir, global_step=self._global_step)
                 # print("checkpoint saved to {}".format(save_path))
