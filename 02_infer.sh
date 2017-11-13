@@ -21,7 +21,7 @@
 
 # Urban Cologne videos
 # TRAINING="Training_A"
-TRAINING="Training_Mapillary_1000"
+TRAINING=""
 IMAGES=1
 VIDEO=0
 
