@@ -102,4 +102,9 @@ ENV/
 
 RUNS/
 
-time_needed_for_training.ods
+pretrained_vgg/
+ckpt/
+summaries/
+runs/
+frozen_model/
+optimized_model/
