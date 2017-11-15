@@ -1,31 +1,17 @@
-# WORK (LEARN) IN PROGRESS
-
 # Semantic Segmentation using Fully Convolutional Networks
 
 ## Introduction
-In this project, we demonstrate one of the approaches to semantic
-scene understanding in the problem domain of self-driving car perception.
+This work is a development of [Asimonov's great project](https://github.com/asimonov/CarND3-P2-FCN-Semantic-Segmentation) for the Udacity CarND.
+Specifically, my improvements and expansions consisted in:
+- Little changes here and there to speed up the training. It's now possible to choose whether to use a pure-python batch generator or to use the tensorflow loading and batching functions, that's 20-25% time faster than the maximum speed I achieved using the python batch generator.
+- The use of the [Mapillary dataset](http://blog.mapillary.com/product/2017/05/03/mapillary-vistas-dataset.html), that has more images and labels (the most important for me being lane markings) than Cityscapes.
 
-At the moment there are two state of the art approaches, both using convolutional
-neural networks. One is based on
-detecting bounding boxes around objects of interest (like YOLO and SSD) and
-classifying them. The other approach is semantic segmentation using
-Fully Convolutional Network (FCN) where each pixel
-of an image is classified into one of the relevant classes like 'driveable road space',
-'other vehicles', 'pedestrians', 'buildings' etc.
+The FCN used is the one proposed in [this by Shelhamer, Long
+and Darrell](https://arxiv.org/pdf/1605.06211.pdf), whose code can be found [here](https://github.com/shelhamer/fcn.berkeleyvision.org)
 
-Bounding box detector approach is faster, but does not give quite as valuable
-answers. For example: how would you draw a bounding box around driveable road space?
-The FCN approach is slower, but gives quite precise regions of interest
-in segmented image to be used directly in perception/planning pipelines of
-an autonomous vehicle.
-
-In this work we implement FCN approach using [paper by Shelhamer, Long
-and Darrell](https://arxiv.org/pdf/1605.06211.pdf).
-Their code can be found [here](https://github.com/shelhamer/fcn.berkeleyvision.org)
+## Modify from here on
 
 ## Data Set: Cityscapes
-
 Good labeled datasets are vital to success of supervised learning tasks.
 For the task at hand we chose [Cityscapes dataset](https://www.cityscapes-dataset.com)
 which provides detailed labeled examples of road scene images
