@@ -44,7 +44,7 @@ if dataset == "cityscapes":
 elif dataset == "mapillary":
     import mapillary_labels as dataset_labels
 
-USE_TF_BATCHING = False
+USE_TF_BATCHING = True
 
 
 def load_trained_vgg_vars(sess):
@@ -235,7 +235,7 @@ def train(args, image_shape):
 
         # Create input queues
         train_input_queue = tf.train.slice_input_producer([all_images, all_labels],
-                                                          shuffle=False)
+                                                          shuffle=True)
 
         # Process path and string tensor into an image and a label
         train_image = tf.image.decode_png(tf.read_file(train_input_queue[0]), channels=3)
@@ -529,7 +529,7 @@ def optimise_graph(args):
     shutil.move(args.frozen_model_dir+'/optimised_graph.pb', args.optimised_model_dir)
 
 
-def predict_video(args, image_shape=None):
+def predict_video(args, image_shape=None, force_reshape=True):
     if args.video_file_in is None:
         print("for video processing need --video_file_in")
         return
@@ -559,12 +559,15 @@ def predict_video(args, image_shape=None):
     
     # The actual frame processing is dealt with in this function
     def process_frame(image):
+        segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
+        return segmented_image
+        
+    def process_frame_with_reshape(image):
         if image_shape is not None:
             # Apply intrisic camera calibration (undistort) --> not needed as I've already undistorted the test videos beforehand
             # image = camera_calibration.undistort_image(image, mtx, dist)  # adds about 14% of overhead
-            image = scipy.misc.imresize(image, image_shape)  # really necessary
+            image = scipy.misc.imresize(image, image_shape)
         segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
-        # print((tf_time_ms, img_time_ms))
         return segmented_image
 
     tf.reset_default_graph()
@@ -574,10 +577,18 @@ def predict_video(args, image_shape=None):
         print('Running on video {}, output to: {}'.format(args.video_file_in, args.video_file_out))
         colors = get_colors()
         input_clip = VideoFileClip(args.video_file_in)
-        if args.video_start_second is None or args.video_end_second is None:
-            annotated_clip = input_clip.fl_image(process_frame)
+        
+        if force_reshape:
+            if args.video_start_second is None or args.video_end_second is None:
+                annotated_clip = input_clip.fl_image(process_frame_with_reshape)
+            else:
+                annotated_clip = input_clip.fl_image(process_frame_with_reshape).subclip(args.video_start_second,args.video_end_second)
         else:
-            annotated_clip = input_clip.fl_image(process_frame).subclip(args.video_start_second,args.video_end_second)
+            if args.video_start_second is None or args.video_end_second is None:
+                annotated_clip = input_clip.fl_image(process_frame)
+            else:
+                annotated_clip = input_clip.fl_image(process_frame).subclip(args.video_start_second,args.video_end_second)
+                
         annotated_clip.write_videofile(args.video_file_out, audio=False)
         # for half size
         # ubuntu/1080ti. with GPU ??fps. with CPU the same??
@@ -657,7 +668,7 @@ if __name__ == '__main__':
 
     # This enables a faster (but slightly uglier, less saturated) code to paint on the output images and videos.
     # The idea is to disable it when preparing images and videos for presentations.
-    faster_image_painting = False
+    faster_image_painting = True
 
     args = parse_args()
 
@@ -697,5 +708,6 @@ if __name__ == '__main__':
         optimise_graph(args)
     elif args.action == 'video':
         #image_shape = None
-        image_shape = (int(720/2), int(1280/2))
-        predict_video(args, image_shape)
+        #image_shape = (int(720/2), int(1280/2))  # Original code
+        image_shape = (256, 512)                  # My version to have the same form factor of the train images
+        predict_video(args, image_shape, False if image_shape == (256, 512) else True)
