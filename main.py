@@ -23,9 +23,13 @@ import pickle
 import cv2
 
 import tensorflow as tf
+from tensorflow.contrib.data import Dataset, Iterator
+from tensorflow.python.framework import ops
+from tensorflow.python.framework import dtypes
 from tensorflow.python.framework import graph_util as tf_graph_util
 from tqdm import tqdm
 import scipy.misc
+import scipy.io as sio
 import numpy as np
 from moviepy.editor import VideoFileClip
 
@@ -39,6 +43,8 @@ if dataset == "cityscapes":
     import cityscape_labels as dataset_labels
 elif dataset == "mapillary":
     import mapillary_labels as dataset_labels
+
+USE_TF_BATCHING = True
 
 
 def load_trained_vgg_vars(sess):
@@ -72,6 +78,7 @@ def load_trained_vgg_vars(sess):
 def get_train_batch_generator(images_path_pattern, labels_path_pattern, image_shape):
     """
     Generate function to create batches of training data
+    This function is ignored if USE_TF_BATCHING is True, as in that case batching operations are dealt with by Tensorflow itself
     :param images_path_pattern: path pattern for images
     :param labels_path_pattern: path pattern for labels
     :param image_shape: Tuple - Shape of image
@@ -185,13 +192,81 @@ def get_train_batch_generator(images_path_pattern, labels_path_pattern, image_sh
 
 
 def train(args, image_shape):
+    # DOCUMENTATION
+    # https://www.tensorflow.org/api_docs/python/tf/train/batch
+    # https://www.tensorflow.org/programmers_guide/datasets
+    # http://ischlag.github.io/2016/06/19/tensorflow-input-pipeline-example/
+    # https://kratzert.github.io/2017/06/15/example-of-tensorflows-new-input-pipeline.html
+
     config = session_config(args)
-    
+
     # extract pre-trained VGG weights
     with tf.Session(config=config) as sess:
         var_values = load_trained_vgg_vars(sess)
     tf.reset_default_graph()
     
+    # This portion of the code is enabled only if USE_TF_BATCHING is enabled
+    if USE_TF_BATCHING:
+        # Load paths and images in memory (they're only string, there's space)
+        images_path_pattern = args.images_paths
+        labels_path_pattern = args.labels_paths                                              
+        image_paths = glob.glob(images_path_pattern)
+        if dataset == "cityscapes":
+            label_paths_tmp = {re.sub('_gtFine_labelTrainIds', '_leftImg8bit', os.path.basename(path)): path
+                                for path in glob.glob(labels_path_pattern)}
+        elif dataset == "mapillary":
+            label_paths_tmp = {re.sub('_instance', '_image', os.path.basename(path)): path
+                                for path in glob.glob(labels_path_pattern)}
+        num_classes = len(dataset_labels.labels)
+        num_samples = len(image_paths)
+        assert len(image_paths) == len(label_paths_tmp)
+
+        print("num_classes={}".format(num_classes))
+        print("num_samples={}".format(num_samples))
+
+        label_paths = []
+        for image_file in image_paths:
+            label_paths.append(label_paths_tmp[os.path.basename(image_file)])
+            # Now we have a list of image_paths and one of label_paths
+
+        # Convert string into tensors
+        all_images = ops.convert_to_tensor(image_paths, dtype=dtypes.string)
+        all_labels = ops.convert_to_tensor(label_paths, dtype=dtypes.string)
+
+        # Create input queues
+        train_input_queue = tf.train.slice_input_producer([all_images, all_labels],
+                                                          shuffle=True)
+
+        # Process path and string tensor into an image and a label
+        train_image = tf.image.decode_png(tf.read_file(train_input_queue[0]), channels=3)
+        train_label = tf.image.decode_png(tf.read_file(train_input_queue[1]), channels=1)
+
+        # Define tensor shape
+        train_image.set_shape([256, 512, 3])
+        train_label.set_shape([256, 512, 1])
+
+        # One hot on the label
+        train_label_one_hot = tf.one_hot(tf.squeeze(train_label), num_classes)
+
+        # Collect batches of images before processing
+        train_image_batch, train_label_batch = tf.train.batch([train_image, train_label_one_hot],
+                                                              batch_size=args.batch_size,
+                                                              allow_smaller_final_batch=True,
+                                                              num_threads=1)
+
+        def dummy_batch_fn(sess):
+            tmp_image_batch, tmp_label_batch = sess.run([train_image_batch, train_label_batch])
+            """
+            print(debug)
+            for i in range(tmp_label_batch.shape[0]):
+                print("R={:6d}    S={:6d}    T={:6d}".format(np.count_nonzero(tmp_label_batch[i,:,:,13]),
+                                                             np.count_nonzero(tmp_label_batch[i,:,:,27]),
+                                                             np.count_nonzero(tmp_label_batch[i,:,:,30])))
+            """
+            return np.array(tmp_image_batch), np.array(tmp_label_batch)
+
+
+    # TF session
     with tf.Session(config=config) as sess:
         # define our FCN
         num_classes = len(dataset_labels.labels)
@@ -200,19 +275,31 @@ def train(args, image_shape):
         # variables initialization
         sess.run(tf.global_variables_initializer())
         model.restore_variables(sess, var_values)
-        
-        # Create batch generator
-        train_batches_fn, num_samples = get_train_batch_generator(args.images_paths,
+
+        if USE_TF_BATCHING:
+            # initialize the queue threads to start to shovel data
+            coord = tf.train.Coordinator()
+            threads = tf.train.start_queue_runners(coord=coord)
+        else:
+            train_batches_fn, num_samples = get_train_batch_generator(args.images_paths,
                                                                   args.labels_paths,
                                                                   image_shape)
+
+        # Details for saving
         time_str = time.strftime("%Y%m%d_%H%M%S")
         run_name = "/{}_ep{}_b{}_lr{:.6f}_kp{}".format(time_str, args.epochs, args.batch_size, args.learning_rate, args.keep_prob)
         start_time = time.time()
 
-        final_loss = model.train(sess, args.epochs, args.batch_size,
-                                 train_batches_fn, num_samples,
-                                 args.keep_prob, args.learning_rate,
-                                 args.ckpt_dir, args.summary_dir+run_name)
+        if USE_TF_BATCHING:
+            final_loss = model.train2(sess, args.epochs, args.batch_size,
+                                      dummy_batch_fn, num_samples,
+                                      args.keep_prob, args.learning_rate,
+                                      args.ckpt_dir, args.summary_dir+run_name)
+        else:
+            final_loss = model.train(sess, args.epochs, args.batch_size,
+                                     train_batches_fn, num_samples,
+                                     args.keep_prob, args.learning_rate,
+                                     args.ckpt_dir, args.summary_dir+run_name)
 
         # Make folder for current run
         output_dir = os.path.join(args.runs_dir, time_str)
@@ -235,7 +322,6 @@ def train(args, image_shape):
             f.write('total_time_hrs={}\n'.format(duration/3600))
 
         # save model
-        """ save trained model using SavedModelBuilder """
         if args.model_dir is None:
             model_dir = os.path.join(output_dir, 'model')
         else:
@@ -243,6 +329,10 @@ def train(args, image_shape):
         print('saving trained model to {}'.format(model_dir))
         model.save_model(sess, model_dir)
 
+        # stop our queue threads and properly close the session
+        coord.request_stop()
+        coord.join(threads)
+        sess.close()
 
 def predict_image(sess, model, image, colors_dict):
     # this image size is arbitrary and may break middle of decoder in the network.
@@ -439,7 +529,7 @@ def optimise_graph(args):
     shutil.move(args.frozen_model_dir+'/optimised_graph.pb', args.optimised_model_dir)
 
 
-def predict_video(args, image_shape=None):
+def predict_video(args, image_shape=None, force_reshape=True):
     if args.video_file_in is None:
         print("for video processing need --video_file_in")
         return
@@ -469,13 +559,15 @@ def predict_video(args, image_shape=None):
     
     # The actual frame processing is dealt with in this function
     def process_frame(image):
-        if image_shape is not None:
-            with tf.device('/cpu:0'):  # tried this to speed up processing but not really improving time...
-                # Apply intrisic camera calibration (undistort) --> not needed as I've already undistorted the test videos beforehand
-                # image = camera_calibration.undistort_image(image, mtx, dist)  # adds about 14% of overhead
-                image = scipy.misc.imresize(image, image_shape)  # really necessary
         segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
-        # print((tf_time_ms, img_time_ms))
+        return segmented_image
+        
+    def process_frame_with_reshape(image):
+        if image_shape is not None:
+            # Apply intrisic camera calibration (undistort) --> not needed as I've already undistorted the test videos beforehand
+            # image = camera_calibration.undistort_image(image, mtx, dist)  # adds about 14% of overhead
+            image = scipy.misc.imresize(image, image_shape)
+        segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
         return segmented_image
 
     tf.reset_default_graph()
@@ -485,10 +577,18 @@ def predict_video(args, image_shape=None):
         print('Running on video {}, output to: {}'.format(args.video_file_in, args.video_file_out))
         colors = get_colors()
         input_clip = VideoFileClip(args.video_file_in)
-        if args.video_start_second is None or args.video_end_second is None:
-            annotated_clip = input_clip.fl_image(process_frame)
+        
+        if force_reshape:
+            if args.video_start_second is None or args.video_end_second is None:
+                annotated_clip = input_clip.fl_image(process_frame_with_reshape)
+            else:
+                annotated_clip = input_clip.fl_image(process_frame_with_reshape).subclip(args.video_start_second,args.video_end_second)
         else:
-            annotated_clip = input_clip.fl_image(process_frame).subclip(args.video_start_second,args.video_end_second)
+            if args.video_start_second is None or args.video_end_second is None:
+                annotated_clip = input_clip.fl_image(process_frame)
+            else:
+                annotated_clip = input_clip.fl_image(process_frame).subclip(args.video_start_second,args.video_end_second)
+                
         annotated_clip.write_videofile(args.video_file_out, audio=False)
         # for half size
         # ubuntu/1080ti. with GPU ??fps. with CPU the same??
@@ -568,7 +668,7 @@ if __name__ == '__main__':
 
     # This enables a faster (but slightly uglier, less saturated) code to paint on the output images and videos.
     # The idea is to disable it when preparing images and videos for presentations.
-    faster_image_painting = False
+    faster_image_painting = True
 
     args = parse_args()
 
@@ -608,5 +708,6 @@ if __name__ == '__main__':
         optimise_graph(args)
     elif args.action == 'video':
         #image_shape = None
-        image_shape = (int(720/2), int(1280/2))
-        predict_video(args, image_shape)
+        #image_shape = (int(720/2), int(1280/2))  # Original code
+        image_shape = (256, 512)                  # My version to have the same form factor of the train images
+        predict_video(args, image_shape, False if image_shape == (256, 512) else True)
