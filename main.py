@@ -21,6 +21,7 @@ from timeit import default_timer as timer
 import math
 import pickle
 import cv2
+import scipy.ndimage.measurements as scipymeas
 
 import tensorflow as tf
 from tensorflow.contrib.data import Dataset, Iterator
@@ -36,6 +37,7 @@ from moviepy.editor import VideoFileClip
 import helper
 import fcn8vgg16
 import camera_calibration
+import object_tracking
 
 # dataset = "cityscapes"
 dataset = "mapillary"
@@ -334,7 +336,7 @@ def train(args, image_shape):
         coord.join(threads)
         sess.close()
 
-def predict_image(sess, model, image, colors_dict):
+def predict_image(sess, model, image, colors_dict, tracker=None):
     # this image size is arbitrary and may break middle of decoder in the network.
     # need to feed FCN images sizes in multiples of 32
     image_shape = [x for x in image.shape]
@@ -351,6 +353,32 @@ def predict_image(sess, model, image, colors_dict):
     predicted_class = np.array(predicted_class, dtype=np.uint8)
     duration = timer() - start_time
     tf_time_ms = int(duration * 1000)
+
+    def generate_bboxes(labels):
+        bboxes = []
+        # centroids = []
+        for labelnr in range(1, labels[1] + 1):
+            nonzero = (labels[0] == labelnr).nonzero()
+            nonzeroy = np.array(nonzero[0])
+            nonzerox = np.array(nonzero[1])
+            bbox = ((np.min(nonzerox), np.min(nonzeroy)), (np.max(nonzerox), np.max(nonzeroy)))
+            bboxes.append(bbox)
+            """
+            centroid = ((np.min(nonzerox) + np.max(nonzerox)) / 2,
+                        (np.min(nonzeroy) + np.max(nonzeroy)) / 2)
+            centroids.append(centroid)
+            """
+        return bboxes
+
+    def draw_boxes(img, bboxes, color=(255,255,255), thick=1):
+        # Make a copy of the image
+        imcopy = np.copy(img)
+        # Iterate through the bounding boxes
+        for bbox in bboxes:
+            # Draw a rectangle given bbox coordinates
+            cv2.rectangle(imcopy, bbox[0], bbox[1], color, thick)
+        # Return the image copy with boxes drawn
+        return imcopy
 
     # overlay on image
     start_time = timer()
@@ -373,7 +401,24 @@ def predict_image(sess, model, image, colors_dict):
             # https://stackoverflow.com/questions/19561597/pil-image-paste-on-another-image-with-alpha
             result_im.paste(mask, box=None, mask=mask)
         segmented_image = np.array(result_im)
-      
+
+        # Bounding boxes around the car
+        # TODO Use one tracker for each vehicle category. Interesting label numbers: [19, 52, 54, 55, 56, 57, 59, 60, 61, 62]
+        car_label = 55
+        car_aoi = predicted_class[:, :, car_label]
+
+        # car_labelled_aoi will contain a list of cars (adjacent cars are treated as one single car, this needs to be improved) TODO
+        car_labelled_aoi = scipymeas.label(car_aoi)
+
+        if tracker is not None:
+            tracker.update_heatmap(car_aoi)
+            car_bboxes = generate_bboxes(scipymeas.label(tracker.heatmap))
+        else:
+            car_bboxes = generate_bboxes(car_labelled_aoi)
+
+        # Draw boxes
+        segmented_image = draw_boxes(segmented_image, car_bboxes)
+
     duration = timer() - start_time
     img_time_ms = int(duration * 1000)
 
@@ -556,10 +601,13 @@ def predict_video(args, image_shape=None, force_reshape=True):
         print("WARNING: Couldn't load camera calibration file, generate one using generate_intrinsic_calibration")
         mtx = None
         dist = None
+
+    # Initializing tracker object to track movable vehicles
+    tracker = object_tracking.Tracker()
     
     # The actual frame processing is dealt with in this function
     def process_frame(image):
-        segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
+        segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors, tracker)
         return segmented_image
         
     def process_frame_with_reshape(image):
@@ -567,7 +615,7 @@ def predict_video(args, image_shape=None, force_reshape=True):
             # Apply intrisic camera calibration (undistort) --> not needed as I've already undistorted the test videos beforehand
             # image = camera_calibration.undistort_image(image, mtx, dist)  # adds about 14% of overhead
             image = scipy.misc.imresize(image, image_shape)
-        segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors)
+        segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors, tracker)
         return segmented_image
 
     tf.reset_default_graph()
@@ -668,7 +716,7 @@ if __name__ == '__main__':
 
     # This enables a faster (but slightly uglier, less saturated) code to paint on the output images and videos.
     # The idea is to disable it when preparing images and videos for presentations.
-    faster_image_painting = True
+    faster_image_painting = False
 
     args = parse_args()
 
