@@ -405,14 +405,14 @@ def predict_image(sess, model, image, colors_dict, trackers=[]):
             result_im.paste(mask, box=None, mask=mask)
         segmented_image = np.array(result_im)
 
-        # Bounding boxes
-        for tracker in trackers:
-            aoi = predicted_class[:, :, tracker.label_nr]
-            # labelled_aoi = scipymeas.label(aoi)     # labelled_aoi will contain a list of cars (adjacent cars are treated as one single car, this needs to be improved) TODO
-            tracker.update_heatmap(aoi)
-            bboxes = generate_bboxes(scipymeas.label(tracker.heatmap))
-            # bombo = np.asarray(colors_dict[tracker.label_nr][0,:3], dtype=np.int32)
-            segmented_image = draw_boxes(segmented_image, bboxes, tracker.label_nr)
+    # Bounding boxes
+    for tracker in trackers:
+        aoi = predicted_class[:, :, tracker.label_nr]
+        # labelled_aoi = scipymeas.label(aoi)     # labelled_aoi will contain a list of cars (adjacent cars are treated as one single car, this needs to be improved) TODO
+        tracker.update_heatmap(aoi)
+        bboxes = generate_bboxes(scipymeas.label(tracker.heatmap))
+        # bombo = np.asarray(colors_dict[tracker.label_nr][0,:3], dtype=np.int32)
+        segmented_image = draw_boxes(segmented_image, bboxes, tracker.label_nr)
 
     duration = timer() - start_time
     img_time_ms = int(duration * 1000)
@@ -714,7 +714,7 @@ if __name__ == '__main__':
 
     # This enables a faster (but slightly uglier, less saturated) code to paint on the output images and videos.
     # The idea is to disable it when preparing images and videos for presentations.
-    faster_image_painting = False
+    faster_image_painting = True
 
     args = parse_args()
 
