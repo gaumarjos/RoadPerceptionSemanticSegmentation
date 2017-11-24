@@ -336,7 +336,7 @@ def train(args, image_shape):
         coord.join(threads)
         sess.close()
 
-def predict_image(sess, model, image, colors_dict, tracker=None):
+def predict_image(sess, model, image, colors_dict, trackers=[]):
     # this image size is arbitrary and may break middle of decoder in the network.
     # need to feed FCN images sizes in multiples of 32
     image_shape = [x for x in image.shape]
@@ -370,13 +370,16 @@ def predict_image(sess, model, image, colors_dict, tracker=None):
             """
         return bboxes
 
-    def draw_boxes(img, bboxes, color=(255,255,255), thick=1):
+    def draw_boxes(img, bboxes, label_nr, color=(255,255,255), thick=1):
         # Make a copy of the image
         imcopy = np.copy(img)
         # Iterate through the bounding boxes
         for bbox in bboxes:
             # Draw a rectangle given bbox coordinates
             cv2.rectangle(imcopy, bbox[0], bbox[1], color, thick)
+            cv2.putText(imcopy,
+                        dataset_labels.id2name[label_nr],
+                        bbox[0], cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255,255,255))
         # Return the image copy with boxes drawn
         return imcopy
 
@@ -402,22 +405,14 @@ def predict_image(sess, model, image, colors_dict, tracker=None):
             result_im.paste(mask, box=None, mask=mask)
         segmented_image = np.array(result_im)
 
-        # Bounding boxes around the car
-        # TODO Use one tracker for each vehicle category. Interesting label numbers: [19, 52, 54, 55, 56, 57, 59, 60, 61, 62]
-        car_label = 55
-        car_aoi = predicted_class[:, :, car_label]
-
-        # car_labelled_aoi will contain a list of cars (adjacent cars are treated as one single car, this needs to be improved) TODO
-        car_labelled_aoi = scipymeas.label(car_aoi)
-
-        if tracker is not None:
-            tracker.update_heatmap(car_aoi)
-            car_bboxes = generate_bboxes(scipymeas.label(tracker.heatmap))
-        else:
-            car_bboxes = generate_bboxes(car_labelled_aoi)
-
-        # Draw boxes
-        segmented_image = draw_boxes(segmented_image, car_bboxes)
+        # Bounding boxes
+        for tracker in trackers:
+            aoi = predicted_class[:, :, tracker.label_nr]
+            # labelled_aoi = scipymeas.label(aoi)     # labelled_aoi will contain a list of cars (adjacent cars are treated as one single car, this needs to be improved) TODO
+            tracker.update_heatmap(aoi)
+            bboxes = generate_bboxes(scipymeas.label(tracker.heatmap))
+            # bombo = np.asarray(colors_dict[tracker.label_nr][0,:3], dtype=np.int32)
+            segmented_image = draw_boxes(segmented_image, bboxes, tracker.label_nr)
 
     duration = timer() - start_time
     img_time_ms = int(duration * 1000)
@@ -603,11 +598,14 @@ def predict_video(args, image_shape=None, force_reshape=True):
         dist = None
 
     # Initializing tracker object to track movable vehicles
-    tracker = object_tracking.Tracker()
+    tracker_labels = [19, 52, 54, 55, 56, 57, 59, 60, 61, 62]
+    trackers = []
+    for tracker_label in tracker_labels:
+        trackers.append(object_tracking.Tracker(tracker_label))
     
     # The actual frame processing is dealt with in this function
     def process_frame(image):
-        segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors, tracker)
+        segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors, trackers)
         return segmented_image
         
     def process_frame_with_reshape(image):
@@ -615,7 +613,7 @@ def predict_video(args, image_shape=None, force_reshape=True):
             # Apply intrisic camera calibration (undistort) --> not needed as I've already undistorted the test videos beforehand
             # image = camera_calibration.undistort_image(image, mtx, dist)  # adds about 14% of overhead
             image = scipy.misc.imresize(image, image_shape)
-        segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors, tracker)
+        segmented_image, tf_time_ms, img_time_ms = predict_image(sess, model, image, colors, trackers)
         return segmented_image
 
     tf.reset_default_graph()

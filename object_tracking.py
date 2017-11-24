@@ -21,12 +21,15 @@ import scipy.io as sio
 import numpy as np
 
 class Tracker():
-    def __init__(self):
+    def __init__(self, label_nr):
+        # Label
+        self.label_nr = label_nr
+
         # Best heatmap
         self.heatmap = None
 
         # Heatmaps FIFO length
-        self.heatmap_fifo_length = 5
+        self.heatmap_fifo_length = 3
 
         # Heatmaps FIFO
         self.heatmap_fifo = deque(maxlen=self.heatmap_fifo_length)
@@ -38,7 +41,7 @@ class Tracker():
         # self.blur_kernel = 3
 
         # Threshold for heatmap
-        self.threshold = 3
+        self.threshold = 2
 
         assert self.heatmap_fifo_length > self.threshold
 

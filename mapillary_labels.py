@@ -92,6 +92,9 @@ for json_label_id, json_label in enumerate(json_labels):
 name2label      = { label.name    : label for label in labels           }
 # id to label object
 id2label        = { label.id      : label for label in labels           }
+# id to name
+id2name         = { label.id      : label.name for label in labels      }
+
 # trainId to label object
 trainId2label   = { label.trainId : label for label in reversed(labels) }
 # category to list of label objects
@@ -155,9 +158,10 @@ if __name__ == "__main__":
     id   = name2label[name].id
     print("ID of label '{name}': {id}".format( name=name, id=id ))
 
-    # Map from ID to label
+    # Map from ID to label and name
     category = id2label[id].category
     print("Category of label with ID '{id}': {category}".format( id=id, category=category ))
+    print("Id to name: {}".format(id2name[55]))
 
     # Map from trainID to label
     trainId = 0
