@@ -576,6 +576,7 @@ if __name__ == '__main__':
         imgL = cv2.imread(fileL)
         imgR = cv2.imread(fileR)
         imgB = cv2.imread(fileB)
+        imgB = cv2.resize(imgB, (1440, 896))# (320, 512)
         cameras.calculate_depth(mycal,
                                 imgL, imgR,
                                 imgB,

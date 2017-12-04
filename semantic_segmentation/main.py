@@ -576,26 +576,6 @@ def predict_video(args, image_shape=None, force_reshape=True):
     if args.video_file_out is None:
         print("for video processing need --video_file_out")
         return
-        
-    # Camera calibration
-    camera_intrinsic_calibration_filename='../videos/camera_calibration/sekonix120.p'
-    camera_intrinsic_calibration_folder='../videos/camera_calibration/sekonix120/'
-    
-    def generate_intrinsic_calibration(self):
-        mtx, dist = camera_calibration(img_size=[1920, 1218],
-                                       calibration_filenames=camera_intrinsic_calibration_folder + '*.jpg',
-                                       verbose=False)
-        return
-    
-    try:
-        cal = pickle.load(open(camera_intrinsic_calibration_filename, "rb"))
-        mtx = cal["mtx"]
-        dist = cal["dist"]
-        print("Camera calibration file loaded")
-    except:
-        print("WARNING: Couldn't load camera calibration file, generate one using generate_intrinsic_calibration")
-        mtx = None
-        dist = None
 
     # Initializing tracker object to track movable vehicles
     tracker_labels = [19, 52, 54, 55, 56, 57, 59, 60, 61, 62]
@@ -747,7 +727,8 @@ if __name__ == '__main__':
         train(args, image_shape)
     elif args.action=='predict':
         print('images_paths={}'.format(args.images_paths))
-        image_shape = (256, 512)
+        #image_shape = (256, 512)
+        image_shape = (320, 512)
         predict_files(args, image_shape)
     elif args.action == 'freeze':
         freeze_graph(args)
@@ -756,5 +737,7 @@ if __name__ == '__main__':
     elif args.action == 'video':
         #image_shape = None
         #image_shape = (int(720/2), int(1280/2))  # Original code
-        image_shape = (256, 512)                  # My version to have the same form factor of the train images
-        predict_video(args, image_shape, False if image_shape == (256, 512) else True)
+        #image_shape = (256, 512)                  # My version to have the same form factor of the train images
+        image_shape = (1440, 896)
+        #predict_video(args, image_shape, False if image_shape == (256, 512) else True)
+        predict_video(args, image_shape, False)
