@@ -30,7 +30,7 @@ def imread_crop(filename, ratio):
 
 def crop_and_resize(img):
     crop_left = 280
-    crop_right = 1140+crop_left
+    crop_right = 1440+crop_left
     crop_top = 0
     crop_bottom = 896
     desired_w = 1440

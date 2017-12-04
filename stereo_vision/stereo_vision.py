@@ -553,8 +553,8 @@ if __name__ == '__main__':
     calibration_folder = '../videos/20171201_stereo_TMG/calibration_frames/'
     toskip = []
     test_folder = '../videos/20171201_stereo_TMG/test_frames/'
-    CALIBRATE = 0
-    TEST = 1
+    CALIBRATE = 1
+    TEST = 0
 
     cameras = Calibration(calibration_folder,
                           toskip=toskip,
