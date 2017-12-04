@@ -108,3 +108,12 @@ summaries/
 runs/
 frozen_model/
 optimised_model/
+
+videos/20171103_mono_colognecentre/*
+videos/20171201_stereo_TMG/calibration_frames/calibration_right*
+videos/20171201_stereo_TMG/calibration_frames/calibration_left*
+mapillary/*
+stereo_vision/disparity*
+videos/Offline_calibrations/*
+stereo_vision/intermediate*
+

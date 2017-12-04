@@ -9,8 +9,8 @@
 # Urban Cologne videos
 # TRAINING="Training_A"
 TRAINING="mapillary_training_b"
-IMAGES=0
-VIDEO=1
+IMAGES=1
+VIDEO=0
 OPTIMISE=0
 
 MASTERVIDEOFOLDER="20171103_DrivePX_City"

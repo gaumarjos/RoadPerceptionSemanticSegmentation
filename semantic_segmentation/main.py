@@ -710,7 +710,8 @@ if __name__ == '__main__':
     elif dataset == "mapillary":
         train_images_path_pattern = '../mapillary/data/training/images_processed_256x512/*_image.png'
         train_labels_path_pattern = '../mapillary/data/training/instances_processed_256x512/*_instance.png'
-        test_images_path_pattern  = '../mapillary/data/testing/*.jpg'  # Keep in mind these have all different sizes
+        # test_images_path_pattern  = '../mapillary/data/testing/*.jpg'  # Keep in mind these have all different sizes
+        test_images_path_pattern  = '../videos/20171201_stereo_TMG/test_frames/*_cropped.png'  # To be used with the images recorded in Cologne
 
     # This enables a faster (but slightly uglier, less saturated) code to paint on the output images and videos.
     # The idea is to disable it when preparing images and videos for presentations.

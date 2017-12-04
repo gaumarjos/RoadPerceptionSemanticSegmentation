@@ -68,7 +68,7 @@ class BMTuner():
     https://docs.opencv.org/2.4.1/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
     """
 
-    def __init__(self, undistorted_rectifiedL, undistorted_rectifiedR):
+    def __init__(self, undistorted_rectifiedL, undistorted_rectifiedR, undistorted_rectified_background):
         # Matcher
         window_size = 5
         self.minDisparity = 0
@@ -89,14 +89,15 @@ class BMTuner():
         # Input images
         self.undistorted_rectifiedL = undistorted_rectifiedL
         self.undistorted_rectifiedR = undistorted_rectifiedR
+        self.undistorted_rectified_background = undistorted_rectified_background
         self.grayL = cv2.cvtColor(self.undistorted_rectifiedL, cv2.COLOR_BGR2GRAY)
         self.grayR = cv2.cvtColor(self.undistorted_rectifiedR, cv2.COLOR_BGR2GRAY)
 
         # Disparity crop
-        self.crop_left = 0
-        self.crop_right = -1
+        self.crop_left = 100
+        self.crop_right = -100
         self.crop_top = 0
-        self.crop_bottom = -1
+        self.crop_bottom = 700
         
         # Create window
         self.windowNameD = "SGBM Stereo Disparity"
@@ -264,7 +265,7 @@ class BMTuner():
                             [0, 0, 1,      0]])
             points = cv2.reprojectImageTo3D(self.disparity_scaled, Q)
             #colors = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)   # I don't think it makes sense, as the disparity is calculated on the remapped image not on imgL
-            colors = cv2.cvtColor(self.undistorted_rectifiedL,
+            colors = cv2.cvtColor(self.undistorted_rectified_background,
                                   cv2.COLOR_BGR2RGB)
             colors = colors[self.crop_top:self.crop_bottom,self.crop_left:self.crop_right]
             mask = self.disparity_scaled > self.disparity_scaled.min()
@@ -516,7 +517,7 @@ class Calibration():
         return
 
 
-    def calculate_depth(self, calibration, imgL, imgR, save_intermediate=False):
+    def calculate_depth(self, calibration, imgL, imgR, imgB, save_intermediate=False):
         # uses a modified H. Hirschmuller algorithm [HH08] that differs (see opencv manual)
         # parameters can be adjusted, current ones from [Hamilton / Breckon et al. 2013]
         
@@ -533,13 +534,14 @@ class Calibration():
         # N.B. mapping works independant of number of image channels
         undistorted_rectifiedL = cv2.remap(imgL, calibration["mapL1"], calibration["mapL2"], interpolation=cv2.INTER_LINEAR)
         undistorted_rectifiedR = cv2.remap(imgR, calibration["mapR1"], calibration["mapR2"], interpolation=cv2.INTER_LINEAR)
+        undistorted_rectified_background = cv2.remap(imgB, calibration["mapR1"], calibration["mapR2"], interpolation=cv2.INTER_LINEAR)
         if save_intermediate:
             cv2.imwrite("intermediate_left.png", undistorted_rectifiedL)
             cv2.imwrite("intermediate_right.png", undistorted_rectifiedR)
         cv2.imshow(self.windowNameL, undistorted_rectifiedL)
         cv2.imshow(self.windowNameR, undistorted_rectifiedR)
 
-        tuner = BMTuner(undistorted_rectifiedL, undistorted_rectifiedR)
+        tuner = BMTuner(undistorted_rectifiedL, undistorted_rectifiedR, undistorted_rectified_background)
 
         """
                 key = cv2.waitKey(0)
@@ -553,8 +555,9 @@ if __name__ == '__main__':
     calibration_folder = '../videos/20171201_stereo_TMG/calibration_frames/'
     toskip = []
     test_folder = '../videos/20171201_stereo_TMG/test_frames/'
-    CALIBRATE = 1
-    TEST = 0
+    segmented_test_folder = '../videos/20171201_stereo_TMG/test_frames_segmented/'
+    CALIBRATE = 0
+    TEST = 1
 
     cameras = Calibration(calibration_folder,
                           toskip=toskip,
@@ -569,9 +572,12 @@ if __name__ == '__main__':
         mycal = pickle.load(open(calibration_folder + "calibration.p", "rb"))
         fileL = test_folder + 'test_left_013_cropped.png'
         fileR = test_folder + 'test_right_013_cropped.png'
+        fileB = segmented_test_folder + 'test_left_013_cropped.png'
         imgL = cv2.imread(fileL)
         imgR = cv2.imread(fileR)
+        imgB = cv2.imread(fileB)
         cameras.calculate_depth(mycal,
                                 imgL, imgR,
+                                imgB,
                                 save_intermediate=1)
 
