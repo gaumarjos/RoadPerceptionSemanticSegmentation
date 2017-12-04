@@ -23,7 +23,7 @@ VIDEOFOLDERS=( "dw_20171102_180413_0.000000_0.000000"     # Durener
                "dw_20171102_181333_0.000000_0.000000"     # Small neighbourhood (My place)
                "dw_20171102_183737_0.000000_0.000000" )   # Deutz bridge
 '
-VIDEOFOLDERS=( "dw_20171102_180413_0.000000_0.000000" )
+VIDEOFOLDERS=( "dw_20171102_185840_0.000000_0.000000" )
 
 VIDEONAME="video_4.h264_256x512"
 
@@ -50,7 +50,7 @@ then
   do
     echo "[$VIDEOFOLDER] processing $VIDEOFILEINPUT --> $VIDEOFILEOUTPUT"
     python main.py video --gpu=1 --xla=2 --model_dir=optimised_model --video_file_in=../videos/$MASTERVIDEOFOLDER/$VIDEOFOLDER/$VIDEOFILEINPUT --video_file_out=../videos/$MASTERVIDEOFOLDER/$VIDEOFOLDER/$VIDEOFILEOUTPUT \
-    --video_start_second 95 --video_end_second 272
+    #--video_start_second 95 --video_end_second 272
   done
 fi
 
