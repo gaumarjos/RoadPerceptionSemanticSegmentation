@@ -15,60 +15,44 @@ import tty
 import sys
 import termios
 
+# Import file in semantic segmentation to automatize labeling
+sys.path.append("../semantic_segmentation")
+import mapillary_labels
+
 
 """
 DOCUMENTATION
 
+Initial
 https://docs.opencv.org/2.4/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
 https://docs.opencv.org/3.0-beta/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
+https://docs.opencv.org/2.4.1/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
 https://github.com/opencv/opencv/blob/master/samples/python/stereo_match.py
 MAYBE https://github.com/opencv/opencv/blob/master/samples/python/morphology.py
-
 https://github.com/julienr/cvscripts/tree/master/rectification
 
-BIBLE
+Great references
 https://github.com/tobybreckon/python-examples-cv/blob/master/stereo_sgbm.py
-
-THE NEW TESTAMENT
 https://github.com/erget/StereoVision
 https://erget.wordpress.com/2014/02/01/calibrating-a-stereo-camera-with-opencv/
 
-FILTERING
+Filtering
 https://docs.opencv.org/3.1.0/d3/d14/tutorial_ximgproc_disparity_filtering.html
 
-THE NEW MESSIAH
-https://www.youtube.com/watch?v=MZsSTpS-XGI
 ADCensus
-
+https://www.youtube.com/watch?v=MZsSTpS-XGI
 """
 
 
-def write_ply(fn, verts, colors):
-    ply_header = '''ply
-                    format ascii 1.0
-                    element vertex %(vert_num)d
-                    property float x
-                    property float y
-                    property float z
-                    property uchar red
-                    property uchar green
-                    property uchar blue
-                    end_header
-                    '''
-    verts = verts.reshape(-1, 3)
-    colors = colors.reshape(-1, 3)
-    verts = np.hstack([verts, colors])
-    with open(fn, 'wb') as f:
-        f.write((ply_header % dict(vert_num=len(verts))).encode('utf-8'))
-        np.savetxt(f, verts, fmt='%f %f %f %d %d %d ')
+"""
+Object to match two images (corrected accordingly to the calibration obatined by the "Calibration" object) and compute the disparity map.
+"""
+class BM():
 
-
-class BMTuner():
     """
-    https://docs.opencv.org/2.4.1/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html
+    Initialization
     """
-
-    def __init__(self, undistorted_rectifiedL, undistorted_rectifiedR, undistorted_rectified_background):
+    def __init__(self, calibration):
         # Matcher
         window_size = 5
         self.minDisparity = 0
@@ -81,88 +65,100 @@ class BMTuner():
         self.speckleWindowSize = 100
         self.speckleRange = 32
         self.preFilterCap = 31
+        
+        # Filter in use
+        self.use_wls_filter = 0
 
-        # Filter
+        # Speckle Filter
+        self.speckle_maxSpeckleSize = 4000
+        self.speckle_maxDiff = 64
+
+        # WLS Filter
         self.wls_lambda = 100000
         self.wls_sigma = 0.8
-
-        # Input images
-        self.undistorted_rectifiedL = undistorted_rectifiedL
-        self.undistorted_rectifiedR = undistorted_rectifiedR
-        self.undistorted_rectified_background = undistorted_rectified_background
-        self.grayL = cv2.cvtColor(self.undistorted_rectifiedL, cv2.COLOR_BGR2GRAY)
-        self.grayR = cv2.cvtColor(self.undistorted_rectifiedR, cv2.COLOR_BGR2GRAY)
 
         # Disparity crop
         self.crop_left = 100
         self.crop_right = -100
         self.crop_top = 0
         self.crop_bottom = 700
-        
-        # Create window
-        self.windowNameD = "SGBM Stereo Disparity"
-        cv2.namedWindow(self.windowNameD, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(self.windowNameD, 1200, 1000)
-        cv2.moveWindow(self.windowNameD, 0, 0)
-        cv2.createTrackbar("change_minDisparity", self.windowNameD, self.minDisparity, 100, self.change_minDisparity)
-        cv2.createTrackbar("change_numDisparities (*16)", self.windowNameD, int(self.numDisparities/16), 16, self.change_numDisparities)
-        cv2.createTrackbar("change_blockSize", self.windowNameD, self.blockSize, 21, self.change_blockSize)
-        cv2.createTrackbar("change_P1", self.windowNameD, self.P1, 10000, self.change_P1)
-        cv2.createTrackbar("change_P2", self.windowNameD, self.P2, 10000, self.change_P2)
-        cv2.createTrackbar("change_disp12MaxDiff", self.windowNameD, self.disp12MaxDiff, 100, self.change_disp12MaxDiff)
-        cv2.createTrackbar("change_uniquenessRatio", self.windowNameD, self.uniquenessRatio, 100, self.change_uniquenessRatio)
-        cv2.createTrackbar("change_speckleWindowSize", self.windowNameD, self.speckleWindowSize, 1000, self.change_speckleWindowSize)
-        cv2.createTrackbar("change_speckleRange", self.windowNameD, self.speckleRange, 100, self.change_speckleRange)
-        cv2.createTrackbar("change_preFilterCap", self.windowNameD, self.preFilterCap, 100, self.change_preFilterCap)
-        cv2.createTrackbar("change_wls_lambda (/1000)", self.windowNameD, int(self.wls_lambda/1000), 1000000, self.change_wls_lambda)
-        cv2.createTrackbar("change_wls_sigma (/10)", self.windowNameD, int(self.wls_sigma*10), 40, self.change_wls_sigma)
-        cv2.setMouseCallback(self.windowNameD, self.save_cloud_function)  # Right click on the image to save the point cloud
-        
-        # Run the first time
-        self.refreshBM()
-        
-        while 1:
-            k = cv2.waitKey()
-            if k == 27:
-                break
-            
-        
-    def refreshBM(self):
-        matcherL = cv2.StereoSGBM_create(minDisparity=self.minDisparity,
-                                         numDisparities=self.numDisparities,
-                                         blockSize=self.blockSize,
-                                         P1=self.P1,
-                                         P2=self.P2,
-                                         disp12MaxDiff=self.disp12MaxDiff,
-                                         uniquenessRatio=self.uniquenessRatio,
-                                         speckleWindowSize=self.speckleWindowSize,
-                                         speckleRange=self.speckleRange,
-                                         preFilterCap=self.preFilterCap
-                                         )
 
-        matcherR = cv2.ximgproc.createRightMatcher(matcherL)
+        # Create matchers
+        self._create_matchers()
+        
+        # Calibration
+        """
+        Old default
+        h, w = imgL.shape[:2]
+        f = 0.8*w                          # guess for focal length
+        self.Q = Q = np.float32([[1, 0, 0, -0.5*w],
+                                 [0,-1, 0,  0.5*h], # turn points 180 deg around x-axis,
+                                 [0, 0, 0,     -f], # so that y-axis looks up
+                                 [0, 0, 1,      0]])
+        """
+        self.Q = calibration["Q"]
+        self.mapL1 = calibration["mapL1"]
+        self.mapL2 = calibration["mapL2"]
+        self.mapR1 = calibration["mapR1"]
+        self.mapR2 = calibration["mapR2"]
 
-        use_wls_filter = 1
-        if use_wls_filter:
+
+    """
+    Create matchers
+    Internal method called once at initialization and multiple times by the tuner
+    """
+    def _create_matchers(self):
+        self.matcherL = cv2.StereoSGBM_create(minDisparity=self.minDisparity,
+                                              numDisparities=self.numDisparities,
+                                              blockSize=self.blockSize,
+                                              P1=self.P1,
+                                              P2=self.P2,
+                                              disp12MaxDiff=self.disp12MaxDiff,
+                                              uniquenessRatio=self.uniquenessRatio,
+                                              speckleWindowSize=self.speckleWindowSize,
+                                              speckleRange=self.speckleRange,
+                                              preFilterCap=self.preFilterCap
+                                              )
+        
+        if self.use_wls_filter:
+            # Create right matcher
+            self.matcherR = cv2.ximgproc.createRightMatcher(self.matcherL)
             # Filter parameters
             visual_multiplier = 1.0
-            wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=matcherL)
-            wls_filter.setLambda(self.wls_lambda)
-            wls_filter.setSigmaColor(self.wls_sigma)
+            self.wls_filter = cv2.ximgproc.createDisparityWLSFilter(matcher_left=self.matcherL)
+            self.wls_filter.setLambda(self.wls_lambda)
+            self.wls_filter.setSigmaColor(self.wls_sigma)
+
+
+    """
+    Calculate the disparity image.
+    This method should be as light as possible as it's supposed to work standalone without the tuner.
+    """
+    def calculate_disparity(self, imgL, imgR):
+        # Pre-process input images
+        undistorted_rectifiedL = cv2.remap(imgL, self.mapL1, self.mapL2, interpolation=cv2.INTER_LINEAR)
+        undistorted_rectifiedR = cv2.remap(imgR, self.mapR1, self.mapR2, interpolation=cv2.INTER_LINEAR)
+        grayL = cv2.cvtColor(undistorted_rectifiedL, cv2.COLOR_BGR2GRAY)
+        grayR = cv2.cvtColor(undistorted_rectifiedR, cv2.COLOR_BGR2GRAY)
 
         # Calculate disparity (return a fixed-point disparity map, where disparity values are multiplied by 16)
-        disparityL = matcherL.compute(self.grayL, self.grayR)
+        disparityL = self.matcherL.compute(grayL, grayR)
 
-        if use_wls_filter:
+        if self.use_wls_filter:
             # Filtered
-            disparityR = matcherR.compute(self.grayR, self.grayL)
-            disparity_filtered = wls_filter.filter(np.int16(disparityL / 16.), self.undistorted_rectifiedL, None, np.int16(disparityR / 16.))
+            disparityR = self.matcherR.compute(grayR, grayL)
+
+            # Experiment: filter the smaller speckles before using the WLS filter to avoid creating artifacts
+            cv2.filterSpeckles(disparityL, 0, self.speckle_maxSpeckleSize, self.speckle_maxDiff)
+            cv2.filterSpeckles(disparityR, 0, self.speckle_maxSpeckleSize, self.speckle_maxDiff)
+
+            disparity_filtered = self.wls_filter.filter(np.int16(disparityL / 16.), undistorted_rectifiedL, None, np.int16(disparityR / 16.))
             disparity_filtered = cv2.normalize(src=disparity_filtered, dst=disparity_filtered, beta=0, alpha=255, norm_type=cv2.NORM_MINMAX)
             disparity_filtered = np.uint8(disparity_filtered)
             self.disparity_scaled = disparity_filtered
         else:
             # Unfiltered
-            # cv2.filterSpeckles(disparityL, 0, 4000, 128)
+            cv2.filterSpeckles(disparityL, 0, self.speckle_maxSpeckleSize, self.speckle_maxDiff)
             self.disparity_scaled = (disparityL / 16.).astype(np.uint8) + abs(disparityL.min())
 
         #B = 200  # distance between images, in mm
@@ -173,7 +169,18 @@ class BMTuner():
         self.disparity_scaled = self.disparity_scaled[self.crop_top:self.crop_bottom,self.crop_left:self.crop_right]
         self.disparity_size = self.disparity_scaled.shape
         
-        # Write on image
+        return self.disparity_scaled
+
+
+    """
+    Internal method called every time a previes needs to be generated by the tuner
+    """
+    def _refresh_preview(self, imgL, imgR):
+
+        self._create_matchers()
+        _ = self.calculate_disparity(imgL, imgR)
+
+        # Write preview
         preview = self.disparity_scaled.copy()
         interline_px = 35
         text = 'minDisparity: {}'.format(self.minDisparity)
@@ -204,80 +211,173 @@ class BMTuner():
         # Display disparity
         cv2.imshow(self.windowNameD, preview)
 
-    def change_minDisparity(self, value):
+
+    """
+    Tuner used to tune stereo matching parameters
+    """
+    def tuner(self, imgL, imgR, imgB):
+
+        # Pre-process the image that will be used by "_save_cloud_function"
+        self.imgL = imgL
+        self.imgR = imgR
+        self.undistorted_rectified_background = cv2.remap(imgB, self.mapR1, self.mapR2, interpolation=cv2.INTER_LINEAR)
+        
+        # Create window
+        self.windowNameD = "SGBM Stereo Disparity"
+        cv2.namedWindow(self.windowNameD, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(self.windowNameD, 1200, 1000)
+        cv2.moveWindow(self.windowNameD, 0, 0)
+        cv2.createTrackbar("change_minDisparity", self.windowNameD, self.minDisparity, 100, self._change_minDisparity)
+        cv2.createTrackbar("change_numDisparities (*16)", self.windowNameD, int(self.numDisparities/16), 16, self._change_numDisparities)
+        cv2.createTrackbar("change_blockSize", self.windowNameD, self.blockSize, 21, self._change_blockSize)
+        cv2.createTrackbar("change_P1", self.windowNameD, self.P1, 10000, self._change_P1)
+        cv2.createTrackbar("change_P2", self.windowNameD, self.P2, 10000, self._change_P2)
+        cv2.createTrackbar("change_disp12MaxDiff", self.windowNameD, self.disp12MaxDiff, 100, self._change_disp12MaxDiff)
+        cv2.createTrackbar("change_uniquenessRatio", self.windowNameD, self.uniquenessRatio, 100, self._change_uniquenessRatio)
+        cv2.createTrackbar("change_speckleWindowSize", self.windowNameD, self.speckleWindowSize, 1000, self._change_speckleWindowSize)
+        cv2.createTrackbar("change_speckleRange", self.windowNameD, self.speckleRange, 100, self._change_speckleRange)
+        cv2.createTrackbar("change_preFilterCap", self.windowNameD, self.preFilterCap, 100, self._change_preFilterCap)
+        cv2.createTrackbar("change_speckle_maxSpeckleSize", self.windowNameD, self.speckle_maxSpeckleSize, 10000, self._change_speckle_maxSpeckleSize)
+        cv2.createTrackbar("change_speckle_maxDiff", self.windowNameD, self.speckle_maxDiff, 256, self._change_speckle_maxDiff)
+        cv2.createTrackbar("change_wls_lambda (/1000)", self.windowNameD, int(self.wls_lambda/1000), 1000, self._change_wls_lambda)
+        cv2.createTrackbar("change_wls_sigma (/10)", self.windowNameD, int(self.wls_sigma*10), 40, self._change_wls_sigma)
+        cv2.setMouseCallback(self.windowNameD, self._save_cloud_function)  # Right click on the image to save the point cloud
+
+        # Run the first time
+        self._refresh_preview(self.imgL, self.imgR)
+
+        while 1:
+            k = cv2.waitKey()
+            if k == 27:
+                break
+
+    """
+    Internal methods used to change single matcher parameters
+    """
+    def _change_minDisparity(self, value):
         self.minDisparity = value
-        self.refreshBM()
-        
-    def change_numDisparities(self, value):
+        self._refresh_preview(self.imgL, self.imgR)
+
+    def _change_numDisparities(self, value):
         self.numDisparities = value * 16
-        self.refreshBM()
-        
-    def change_blockSize(self, value):
+        self._refresh_preview(self.imgL, self.imgR)
+
+    def _change_blockSize(self, value):
         if value > 2 and value < 22 and value%2 == 1:
             self.blockSize = value
-            self.refreshBM()
-        
-    def change_P1(self, value):
+            self._refresh_preview(self.imgL, self.imgR)
+
+    def _change_P1(self, value):
         self.P1 = value
-        self.refreshBM()
-        
-    def change_P2(self, value):
+        self._refresh_preview(self.imgL, self.imgR)
+
+    def _change_P2(self, value):
         self.P2 = value
-        self.refreshBM()
-    
-    def change_disp12MaxDiff(self, value):
+        self._refresh_preview(self.imgL, self.imgR)
+
+    def _change_disp12MaxDiff(self, value):
         self.disp12MaxDiff = value
-        self.refreshBM()
-    
-    def change_uniquenessRatio(self, value):
+        self._refresh_preview(self.imgL, self.imgR)
+
+    def _change_uniquenessRatio(self, value):
         self.uniquenessRatio = value
-        self.refreshBM()
-    
-    def change_speckleWindowSize(self, value):
+        self._refresh_preview(self.imgL, self.imgR)
+
+    def _change_speckleWindowSize(self, value):
         self.speckleWindowSize = value
-        self.refreshBM()
-    
-    def change_speckleRange(self, value):
+        self._refresh_preview(self.imgL, self.imgR)
+
+    def _change_speckleRange(self, value):
         self.speckleRange = value
-        self.refreshBM()
-    
-    def change_preFilterCap(self, value):
+        self._refresh_preview(self.imgL, self.imgR)
+
+    def _change_preFilterCap(self, value):
         self.preFilterCap = value
-        self.refreshBM()
+        self._refresh_preview(self.imgL, self.imgR)
 
-    def change_wls_lambda(self, value):
+    def _change_speckle_maxSpeckleSize(self, value):
+        self.speckle_maxSpeckleSize = value
+        self._refresh_preview(self.imgL, self.imgR)
+
+    def _change_speckle_maxDiff(self, value):
+        self.speckle_maxDiff = value
+        self._refresh_preview(self.imgL, self.imgR)
+
+    def _change_wls_lambda(self, value):
         self.wls_lambda = value * 1000
-        self.refreshBM()
+        self._refresh_preview(self.imgL, self.imgR)
 
-    def change_wls_sigma(self, value):
+    def _change_wls_sigma(self, value):
         self.wls_sigma = value / 10
-        self.refreshBM()
+        self._refresh_preview(self.imgL, self.imgR)
 
-    # Save cloud
-    def save_cloud_function(self, event, x, y, flags, param):
+
+    """
+    Internal method to save a point cloud in Meshlab format
+    """
+    def _write_ply(self, fn, verts, colors):
+        ply_header = '''ply
+                        format ascii 1.0
+                        element vertex %(vert_num)d
+                        property float x
+                        property float y
+                        property float z
+                        property uchar red
+                        property uchar green
+                        property uchar blue
+                        end_header
+                        '''
+        verts = verts.reshape(-1, 3)
+        colors = colors.reshape(-1, 3)
+        verts = np.hstack([verts, colors])
+        with open(fn, 'wb') as f:
+            f.write((ply_header % dict(vert_num=len(verts))).encode('utf-8'))
+            np.savetxt(f, verts, fmt='%f %f %f %d %d %d ')
+
+
+    """
+    Internal method to save the point cloud in a format that an be opened by Meshlab
+    """
+    def _save_cloud_function(self, event, x, y, flags, param):
         if event == cv2.EVENT_RBUTTONDOWN:
             basename = 'disparity'
-            h, w = imgL.shape[:2]
-            f = 0.8*w                          # guess for focal length
-            Q = np.float32([[1, 0, 0, -0.5*w],
-                            [0,-1, 0,  0.5*h], # turn points 180 deg around x-axis,
-                            [0, 0, 0,     -f], # so that y-axis looks up
-                            [0, 0, 1,      0]])
-            points = cv2.reprojectImageTo3D(self.disparity_scaled, Q)
+
+            # Change some signs to turn points 180 deg around x-axis so that y-axis looks up
+            localQ = self.Q.copy()
+            localQ[1,:] = -1 * localQ[1,:]
+            localQ[2,:] = -1 * localQ[2,:]
+
+            points = cv2.reprojectImageTo3D(self.disparity_scaled, localQ)
             #colors = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)   # I don't think it makes sense, as the disparity is calculated on the remapped image not on imgL
             colors = cv2.cvtColor(self.undistorted_rectified_background,
                                   cv2.COLOR_BGR2RGB)
             colors = colors[self.crop_top:self.crop_bottom,self.crop_left:self.crop_right]
-            mask = self.disparity_scaled > self.disparity_scaled.min()
+            infinity_mask = self.disparity_scaled > self.disparity_scaled.min()
+
+            # Mask based on specific labels (color values)
+            car = np.array([0, 0, 142])
+            mask_car = np.array(cv2.inRange(colors, car, car), dtype=bool)
+            person = np.array([220, 20, 60])
+            mask_person = np.array(cv2.inRange(colors, person, person), dtype=bool)
+            sky = np.array([70, 130, 180])
+            mask_sky = np.array(cv2.inRange(colors, sky, sky), dtype=bool)
+
+            #object_mask = np.logical_not(mask_sky)
+            object_mask = mask_car + mask_person
+            mask = np.logical_and(infinity_mask, object_mask)
+
             out_points = points[mask]
             out_colors = colors[mask]
             while os.path.isfile(basename + '.ply'):
                 basename = basename + '_'
             print("Saving point cloud as {}".format(basename + '.ply'))
-            write_ply(basename + '.ply', out_points, out_colors)
+            self._write_ply(basename + '.ply', out_points, out_colors)
             print("Done")
 
 
+"""
+Object to calculate the stereo calibration necessary to match images using the BM object
+"""
 class Calibration():
     def __init__(self, path, left_template, right_template, toskip=[], save=False):
         
@@ -511,42 +611,10 @@ class Calibration():
             self.calibration = { "mapL1": self.mapL1,
                                  "mapL2": self.mapL2,
                                  "mapR1": self.mapR1,
-                                 "mapR2": self.mapR2 }
+                                 "mapR2": self.mapR2,
+                                 "Q": Q}
             pickle.dump(self.calibration, open(self.path + self.calibration_filename, "wb"))
 
-        return
-
-
-    def calculate_depth(self, calibration, imgL, imgR, imgB, save_intermediate=False):
-        # uses a modified H. Hirschmuller algorithm [HH08] that differs (see opencv manual)
-        # parameters can be adjusted, current ones from [Hamilton / Breckon et al. 2013]
-        
-        # FROM manual: stereoProcessor = cv2.StereoSGBM(numDisparities=128, SADWindowSize=21);
-        # From help(cv2): StereoBM_create(...)
-        #        StereoBM_create([, numDisparities[, blockSize]]) -> retval
-        #
-        #    StereoSGBM_create(...)
-        #        StereoSGBM_create(minDisparity, numDisparities, blockSize[, P1[, P2[,
-        # disp12MaxDiff[, preFilterCap[, uniquenessRatio[, speckleWindowSize[, speckleRange[, mode]]]]]]]]) -> retval
-
-        
-        # undistort and rectify based on the mappings (could improve interpolation and image border settings here)
-        # N.B. mapping works independant of number of image channels
-        undistorted_rectifiedL = cv2.remap(imgL, calibration["mapL1"], calibration["mapL2"], interpolation=cv2.INTER_LINEAR)
-        undistorted_rectifiedR = cv2.remap(imgR, calibration["mapR1"], calibration["mapR2"], interpolation=cv2.INTER_LINEAR)
-        undistorted_rectified_background = cv2.remap(imgB, calibration["mapR1"], calibration["mapR2"], interpolation=cv2.INTER_LINEAR)
-        if save_intermediate:
-            cv2.imwrite("intermediate_left.png", undistorted_rectifiedL)
-            cv2.imwrite("intermediate_right.png", undistorted_rectifiedR)
-        cv2.imshow(self.windowNameL, undistorted_rectifiedL)
-        cv2.imshow(self.windowNameR, undistorted_rectifiedR)
-
-        tuner = BMTuner(undistorted_rectifiedL, undistorted_rectifiedR, undistorted_rectified_background)
-
-        """
-                key = cv2.waitKey(0)
-                cv2.destroyAllWindows()
-        """
         return
 
 
@@ -559,13 +627,12 @@ if __name__ == '__main__':
     CALIBRATE = 0
     TEST = 1
 
-    cameras = Calibration(calibration_folder,
+    if CALIBRATE:
+        cameras = Calibration(calibration_folder,
                           toskip=toskip,
                           left_template='calibration_left_*_cropped.png',
                           right_template='calibration_right_*_cropped.png',
                           save=True)
-
-    if CALIBRATE:
         cameras.calibrate(visual=True)
 
     if TEST:
@@ -577,8 +644,13 @@ if __name__ == '__main__':
         imgR = cv2.imread(fileR)
         imgB = cv2.imread(fileB)
         imgB = cv2.resize(imgB, (1440, 896))# (320, 512)
-        cameras.calculate_depth(mycal,
-                                imgL, imgR,
-                                imgB,
-                                save_intermediate=1)
+
+        if 1:
+            block_matcher = BM(mycal)
+            block_matcher.tuner(imgL, imgR, imgB)
+
+        if 0:
+            cv2.imshow("ciao", block_matcher.calculate_disparity(imgL, imgR))
+            key = cv2.waitKey(0)
+            cv2.destroyAllWindows()
 
