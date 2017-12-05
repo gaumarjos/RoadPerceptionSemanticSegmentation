@@ -385,7 +385,16 @@ def predict_image(sess, model, image, colors_dict, trackers=[]):
 
     # overlay on image
     start_time = timer()
-    if faster_image_painting:
+    if image_painting_style == 0:
+        stack = np.zeros(tmp_image.shape, tmp_image.dtype)
+        for label in range(len(colors_dict)):
+            active = np.expand_dims(predicted_class[:, :, label], axis=2)
+            layer = np.full(tmp_image.shape, colors_dict[label][0,0:3])
+            layer = cv2.bitwise_and(layer, layer, mask=active)
+            stack = cv2.addWeighted(stack, 1, layer, 1, 0)
+        segmented_image = stack.copy()
+
+    elif image_painting_style == 1:
         stack = np.zeros(tmp_image.shape, tmp_image.dtype)
         for label in range(len(colors_dict)):
             active = np.expand_dims(predicted_class[:, :, label], axis=2)
@@ -393,7 +402,8 @@ def predict_image(sess, model, image, colors_dict, trackers=[]):
             layer = cv2.bitwise_and(layer, layer, mask=active)
             stack = cv2.addWeighted(stack, 1, layer, 1, 0)
         segmented_image = cv2.addWeighted(tmp_image, 1, stack, 0.5, 0)
-    else:
+
+    elif image_painting_style == 2:
         result_im = scipy.misc.toimage(image)
         for label in range(len(colors_dict)):
             segmentation = np.expand_dims(predicted_class[:, :, label], axis=2)
@@ -695,7 +705,10 @@ if __name__ == '__main__':
 
     # This enables a faster (but slightly uglier, less saturated) code to paint on the output images and videos.
     # The idea is to disable it when preparing images and videos for presentations.
-    faster_image_painting = True
+    # 0: just label colors
+    # 1: fast painting
+    # 2: slow painting (better saturation)
+    image_painting_style = 0
 
     args = parse_args()
 
