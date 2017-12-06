@@ -640,6 +640,7 @@ if __name__ == '__main__':
         fileL = test_folder + 'test_left_013_cropped.png'
         fileR = test_folder + 'test_right_013_cropped.png'
         fileB = segmented_test_folder + 'test_left_013_cropped.png'
+        fileB = fileL.copy()
         imgL = cv2.imread(fileL)
         imgR = cv2.imread(fileR)
         imgB = cv2.imread(fileB)
