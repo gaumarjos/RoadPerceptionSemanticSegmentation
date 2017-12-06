@@ -10,14 +10,11 @@ from collections import deque
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 from moviepy.editor import VideoFileClip
-
-import tty
 import sys
-import termios
 
 # Import file in semantic segmentation to automatize labeling
-sys.path.append("../semantic_segmentation")
-import mapillary_labels
+# sys.path.append("../semantic_segmentation")
+# import mapillary_labels
 
 
 """
@@ -67,7 +64,7 @@ class BM():
         self.preFilterCap = 31
         
         # Filter in use
-        self.use_wls_filter = 0
+        self.use_wls_filter = 1
 
         # Speckle Filter
         self.speckle_maxSpeckleSize = 4000
@@ -351,6 +348,7 @@ class BM():
             #colors = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)   # I don't think it makes sense, as the disparity is calculated on the remapped image not on imgL
             colors = cv2.cvtColor(self.undistorted_rectified_background,
                                   cv2.COLOR_BGR2RGB)
+            # colors = np.zeros_like(self.undistorted_rectified_background)
             colors = colors[self.crop_top:self.crop_bottom,self.crop_left:self.crop_right]
             infinity_mask = self.disparity_scaled > self.disparity_scaled.min()
 
@@ -360,10 +358,11 @@ class BM():
             person = np.array([220, 20, 60])
             mask_person = np.array(cv2.inRange(colors, person, person), dtype=bool)
             sky = np.array([70, 130, 180])
-            mask_sky = np.array(cv2.inRange(colors, sky, sky), dtype=bool)
+            mask_sky = np.logical_not(np.array(cv2.inRange(colors, sky, sky), dtype=bool))
 
             #object_mask = np.logical_not(mask_sky)
-            object_mask = mask_car + mask_person
+            #object_mask = mask_car + mask_person
+            object_mask = mask_sky
             mask = np.logical_and(infinity_mask, object_mask)
 
             out_points = points[mask]
@@ -626,6 +625,7 @@ if __name__ == '__main__':
     segmented_test_folder = '../videos/20171201_stereo_TMG/test_frames_segmented/'
     CALIBRATE = 0
     TEST = 1
+    TUNE = 1
 
     if CALIBRATE:
         cameras = Calibration(calibration_folder,
@@ -645,11 +645,11 @@ if __name__ == '__main__':
         imgB = cv2.imread(fileB)
         imgB = cv2.resize(imgB, (1440, 896))# (320, 512)
 
-        if 1:
-            block_matcher = BM(mycal)
+        block_matcher = BM(mycal)
+        if TUNE:
             block_matcher.tuner(imgL, imgR, imgB)
 
-        if 0:
+        if not TUNE:
             cv2.imshow("ciao", block_matcher.calculate_disparity(imgL, imgR))
             key = cv2.waitKey(0)
             cv2.destroyAllWindows()
