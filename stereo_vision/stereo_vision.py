@@ -639,8 +639,8 @@ if __name__ == '__main__':
         mycal = pickle.load(open(calibration_folder + "calibration.p", "rb"))
         fileL = test_folder + 'test_left_013_cropped.png'
         fileR = test_folder + 'test_right_013_cropped.png'
-        fileB = segmented_test_folder + 'test_left_013_cropped.png'
-        fileB = fileL.copy()
+        fileB = segmented_test_folder + 'test_left_013_cropped.png'  # to use the segmented image
+        #fileB = fileL  # to use the real photo
         imgL = cv2.imread(fileL)
         imgR = cv2.imread(fileR)
         imgB = cv2.imread(fileB)
