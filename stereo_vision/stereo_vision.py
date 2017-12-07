@@ -9,6 +9,9 @@ import pickle
 from collections import deque
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import scipy.ndimage.measurements as scipymeas
+
 from moviepy.editor import VideoFileClip
 import sys
 
@@ -224,20 +227,20 @@ class BM():
         cv2.namedWindow(self.windowNameD, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(self.windowNameD, 1200, 1000)
         cv2.moveWindow(self.windowNameD, 0, 0)
-        cv2.createTrackbar("change_minDisparity", self.windowNameD, self.minDisparity, 100, self._change_minDisparity)
-        cv2.createTrackbar("change_numDisparities (*16)", self.windowNameD, int(self.numDisparities/16), 16, self._change_numDisparities)
-        cv2.createTrackbar("change_blockSize", self.windowNameD, self.blockSize, 21, self._change_blockSize)
-        cv2.createTrackbar("change_P1", self.windowNameD, self.P1, 10000, self._change_P1)
-        cv2.createTrackbar("change_P2", self.windowNameD, self.P2, 10000, self._change_P2)
-        cv2.createTrackbar("change_disp12MaxDiff", self.windowNameD, self.disp12MaxDiff, 100, self._change_disp12MaxDiff)
-        cv2.createTrackbar("change_uniquenessRatio", self.windowNameD, self.uniquenessRatio, 100, self._change_uniquenessRatio)
-        cv2.createTrackbar("change_speckleWindowSize", self.windowNameD, self.speckleWindowSize, 1000, self._change_speckleWindowSize)
-        cv2.createTrackbar("change_speckleRange", self.windowNameD, self.speckleRange, 100, self._change_speckleRange)
-        cv2.createTrackbar("change_preFilterCap", self.windowNameD, self.preFilterCap, 100, self._change_preFilterCap)
-        cv2.createTrackbar("change_speckle_maxSpeckleSize", self.windowNameD, self.speckle_maxSpeckleSize, 10000, self._change_speckle_maxSpeckleSize)
-        cv2.createTrackbar("change_speckle_maxDiff", self.windowNameD, self.speckle_maxDiff, 256, self._change_speckle_maxDiff)
-        cv2.createTrackbar("change_wls_lambda (/1000)", self.windowNameD, int(self.wls_lambda/1000), 1000, self._change_wls_lambda)
-        cv2.createTrackbar("change_wls_sigma (/10)", self.windowNameD, int(self.wls_sigma*10), 40, self._change_wls_sigma)
+        cv2.createTrackbar("minDisparity", self.windowNameD, self.minDisparity, 100, self._change_minDisparity)
+        cv2.createTrackbar("numDisparities (*16)", self.windowNameD, int(self.numDisparities/16), 16, self._change_numDisparities)
+        cv2.createTrackbar("blockSize", self.windowNameD, self.blockSize, 21, self._change_blockSize)
+        cv2.createTrackbar("P1", self.windowNameD, self.P1, 10000, self._change_P1)
+        cv2.createTrackbar("P2", self.windowNameD, self.P2, 10000, self._change_P2)
+        cv2.createTrackbar("disp12MaxDiff", self.windowNameD, self.disp12MaxDiff, 100, self._change_disp12MaxDiff)
+        cv2.createTrackbar("uniquenessRatio", self.windowNameD, self.uniquenessRatio, 100, self._change_uniquenessRatio)
+        cv2.createTrackbar("speckleWindowSize", self.windowNameD, self.speckleWindowSize, 1000, self._change_speckleWindowSize)
+        cv2.createTrackbar("speckleRange", self.windowNameD, self.speckleRange, 100, self._change_speckleRange)
+        cv2.createTrackbar("preFilterCap", self.windowNameD, self.preFilterCap, 100, self._change_preFilterCap)
+        cv2.createTrackbar("speckle_maxSpeckleSize", self.windowNameD, self.speckle_maxSpeckleSize, 10000, self._change_speckle_maxSpeckleSize)
+        cv2.createTrackbar("speckle_maxDiff", self.windowNameD, self.speckle_maxDiff, 256, self._change_speckle_maxDiff)
+        cv2.createTrackbar("wls_lambda (/1000)", self.windowNameD, int(self.wls_lambda/1000), 1000, self._change_wls_lambda)
+        cv2.createTrackbar("wls_sigma (/10)", self.windowNameD, int(self.wls_sigma*10), 40, self._change_wls_sigma)
         cv2.setMouseCallback(self.windowNameD, self._save_cloud_function)  # Right click on the image to save the point cloud
 
         # Run the first time
@@ -345,6 +348,7 @@ class BM():
             localQ[2,:] = -1 * localQ[2,:]
 
             points = cv2.reprojectImageTo3D(self.disparity_scaled, localQ)
+            # Output 3-channel floating-point image of the same size as disparity . Each element of _3dImage(x,y) contains 3D coordinates of the point (x,y) computed from the disparity map.           
             #colors = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)   # I don't think it makes sense, as the disparity is calculated on the remapped image not on imgL
             colors = cv2.cvtColor(self.undistorted_rectified_background,
                                   cv2.COLOR_BGR2RGB)
@@ -364,6 +368,13 @@ class BM():
             #object_mask = mask_car + mask_person
             object_mask = mask_sky
             mask = np.logical_and(infinity_mask, object_mask)
+
+
+            # Experiment with labelling
+            person_points = points[np.logical_and(infinity_mask, mask_person)]
+            person_labels = scipymeas.label(person_points)
+            print(person_labels)
+
 
             out_points = points[mask]
             out_colors = colors[mask]
@@ -618,6 +629,8 @@ class Calibration():
 
 
 if __name__ == '__main__':
+
+    print(cv2.__version__)
 
     calibration_folder = '../videos/20171201_stereo_TMG/calibration_frames/'
     toskip = []
