@@ -29,12 +29,13 @@ def imread_crop(filename, ratio):
     
 
 def crop_and_resize(img):
-    crop_left = 280
-    crop_right = 1440+crop_left
-    crop_top = 0
-    crop_bottom = 896
     desired_w = 1440
     desired_h = 896
+
+    crop_left = 280
+    crop_right = desired_w + crop_left
+    crop_top = 0
+    crop_bottom = desired_h + crop_top
 
     img_cropped = img[crop_top:crop_bottom, crop_left:crop_right]
     img_resized = cv2.resize(img_cropped, (desired_w, desired_h), interpolation=cv2.INTER_LINEAR)
@@ -80,7 +81,7 @@ def preprocess_video(folder, left_basename, right_basename):
 
 
 
-folder = '20171201_stereo_TMG/'
+folder = '20171220_stereo_2nd_calibration_at_TMG/'
 # car2
 # toskip = [5, 7, 8, 9, 10, 13, 27, 28, 29, 30, 38, 40, 41, 42, 43, 44]
 toskip = []
@@ -96,9 +97,18 @@ frame_secs = [1, 11, 16, 27, 31, 60+1, 60+4, 60+12, 60+16, 60+29, 60+35, 60+45, 
               180+44, 180+50, 180+53]
 frame_secs = [2, 14, 27, 30, 36, 47, 54, 60+3]
 """
-# car 3
-calibration_frame_secs = [1, 6, 9, 17, 22, 25, 32, 34, 47, 58, 60+8, 60+13, 60+20, 60+23, 60+30, 60+50, 60+55, 60+58, 120+1, 120+10, 120+13, 120+16, 120+18]
-test_frame_secs = [44, 50, 60+5, 60+27, 60+45, 60+47, 120+37, 120+42, 120+49, 180+47, 180+49, 180+59, 240+8, 240+32, 240+41]
+
+# Relative to folder 20171201_stereo_1st_calibration_at_TMG
+#calibration_frame_secs = [1, 6, 9, 17, 22, 25, 32, 34, 47, 58, 60+8, 60+13, 60+20, 60+23, 60+30, 60+50, 60+55, 60+58, 120+1, 120+10, 120+13, 120+16, 120+18]
+#test_frame_secs = test_frame_secs = [44, 50, 60+5, 60+27, 60+45, 60+47, 120+37, 120+42, 120+49, 180+47, 180+49, 180+59, 240+8, 240+32, 240+41]
+
+# Relative to folder 20171215_stereo_i3
+#calibration_frame_secs = [1, 6, 9, 17, 22, 25, 32, 34, 47, 58, 60+8, 60+13, 60+20, 60+23, 60+30, 60+50, 60+55, 60+58, 120+1, 120+10, 120+13, 120+16, 120+18]
+#test_frame_secs = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20 ,22, 24, 26, 28, 30, 32 ,34, 36, 38, 40, 42, 44, 46, 48, 50, 52]
+
+# Relative to folder 20171201_stereo_2nd_calibration_at_TMG
+calibration_frame_secs = #TODO
+test_frame_secs = test_frame_secs = #TODO
 
 if 1:
     extract_frames_from_video(folder,
