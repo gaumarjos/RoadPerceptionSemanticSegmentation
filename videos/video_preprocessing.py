@@ -27,14 +27,14 @@ def imread_crop(filename, ratio):
     return img_cropped
 """
     
-
+    
 def crop_and_resize(img):
     desired_w = 1440
     desired_h = 896
 
     crop_left = 280
     crop_right = desired_w + crop_left
-    crop_top = 0
+    crop_top = 65
     crop_bottom = desired_h + crop_top
 
     img_cropped = img[crop_top:crop_bottom, crop_left:crop_right]
@@ -43,9 +43,9 @@ def crop_and_resize(img):
     return img_resized
 
 
-def extract_frames_from_video(folder, frame_secs, left_basename, right_basename, i_start=1, output_folder="", preprocess=False):
-    left_clip = VideoFileClip(folder + left_basename + ".mp4")
-    right_clip = VideoFileClip(folder + right_basename + ".mp4")
+def extract_frames_from_video(folder, input_folder, left_basename, right_basename, frame_secs, i_start=1, output_folder="", preprocess=False):
+    left_clip = VideoFileClip(folder + input_folder + left_basename + ".mp4")
+    right_clip = VideoFileClip(folder + input_folder + right_basename + ".mp4")
 
     duration = np.min([left_clip.duration, right_clip.duration])
     print("{} frames will be extracted, the video is {}s long".format(len(frame_secs), duration))
@@ -81,10 +81,6 @@ def preprocess_video(folder, left_basename, right_basename):
 
 
 
-folder = '20171220_stereo_2nd_calibration_at_TMG/'
-# car2
-# toskip = [5, 7, 8, 9, 10, 13, 27, 28, 29, 30, 38, 40, 41, 42, 43, 44]
-toskip = []
 
 # car 1
 """
@@ -107,25 +103,38 @@ frame_secs = [2, 14, 27, 30, 36, 47, 54, 60+3]
 #test_frame_secs = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20 ,22, 24, 26, 28, 30, 32 ,34, 36, 38, 40, 42, 44, 46, 48, 50, 52]
 
 # Relative to folder 20171201_stereo_2nd_calibration_at_TMG
-calibration_frame_secs = #TODO
-test_frame_secs = test_frame_secs = #TODO
-
 if 1:
-    extract_frames_from_video(folder,
-                              calibration_frame_secs,
+    i=240
+    master_folder = '20171220_stereo_2nd_calibration_at_TMG/'
+    extract_frames_from_video(master_folder,
+                              input_folder='calibration_videos/',
                               left_basename='calibration_left',
                               right_basename='calibration_right',
+                              #frame_secs=[3, 9, 18, 34, 38, 41, 48, 52, 54, 56, 60, 60+5, 60+9, 60+15, 60+18, 60+21, 60+24,  60+27, 60+30, 60+33, 60+36, 60+41, 60+44, 60+47, 60+50, 60+53, 60+56, 60+60, 60+64, 60+70, 60+74, 60+77, 60+83, 60+86, 60+90, 60+93, 60+98, 60+103, 60+107, 180+8, 180+12, 180+16, 180+20, 180+26, 180+29, 180+32, 180+39, 180+42, 180+47, 180+50], # BIG BOARD
+                              frame_secs=[i+27, i+31, i+34, i+37, i+40, i+46, i+49, i+54, i+57, i+60, i+63, i+65, i+68, i+71, i+74, i+77, i+79, i+82, i+86, i+90, i+94, i+96, i+99, i+103, i+106, i+109, i+113, i+120, i+124, i+127, i+129, i+138, i+140, i+146, i+149, i+151, i+153, i+165], # schmall BOARD
                               i_start=1,
-                              output_folder='calibration_frames/',
+                              output_folder='calibration_frames_small/',
                               preprocess=1)
-                              
-    extract_frames_from_video(folder,
-                              test_frame_secs,
-                              left_basename='test_left',
-                              right_basename='test_right',
+
+"""
+    extract_frames_from_video(master_folder,
+                              input_folder='distance_indoor_videos/',
+                              left_basename='distance_indoor_left',
+                              right_basename='distance_indoor_right',
+                              frame_secs=[60+16, 60+39, 60+52, 120+14, 120+32, 120+51, 180+10, 180+27, 180+44, 180+56, 240+14, 240+30, 240+46, 300+3],
                               i_start=1,
-                              output_folder='test_frames/',
+                              output_folder='distance_indoor_frames/',
                               preprocess=1)
+
+    extract_frames_from_video(master_folder,
+                              input_folder='distance_outdoor_videos/',
+                              left_basename='distance_outdoor_left',
+                              right_basename='distance_outdoor_right',
+                              frame_secs=[12, 24, 38, 56, 60+8, 60+24, 60+41, 60+59, 120+14, 120+30, 180+10, 180+27, 180+43, 180+59, 240+22, 240+41, 300+3, 300+31, 420+2],
+                              i_start=1,
+                              output_folder='distance_outdoor_frames/',
+                              preprocess=1)
+"""
 
 if 0:
     preprocess_video(folder,
