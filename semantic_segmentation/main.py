@@ -391,7 +391,8 @@ def predict_image(sess, model, image, colors_dict, trackers=[]):
             active = np.expand_dims(predicted_class[:, :, label], axis=2)
             layer = np.full(tmp_image.shape, colors_dict[label][0,0:3])
             layer = cv2.bitwise_and(layer, layer, mask=active)
-            stack = cv2.addWeighted(stack, 1, layer, 1, 0)
+            # stack = cv2.addWeighted(stack, 1, layer, 1, 0)
+            stack = stack + layer
         segmented_image = stack.copy()
 
     elif image_painting_style == 1:
@@ -701,7 +702,8 @@ if __name__ == '__main__':
         train_images_path_pattern = '../mapillary/data/training/images_processed_256x512/*_image.png'
         train_labels_path_pattern = '../mapillary/data/training/instances_processed_256x512/*_instance.png'
         # test_images_path_pattern  = '../mapillary/data/testing/*.jpg'  # Keep in mind these have all different sizes
-        test_images_path_pattern  = '../videos/20171201_stereo_TMG/test_frames/*_cropped.png'  # To be used with the images recorded in Cologne
+        #test_images_path_pattern  = '../videos/20171201_stereo_TMG/test_frames/*_cropped.png'  # To be used with the images recorded in Cologne
+        test_images_path_pattern  = '../videos/20171201_stereo_TMG/move_i3/*_cropped.png'  # To be used with the images recorded on TMG proving grounds
 
     # This enables a faster (but slightly uglier, less saturated) code to paint on the output images and videos.
     # The idea is to disable it when preparing images and videos for presentations.
