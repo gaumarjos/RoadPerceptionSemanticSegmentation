@@ -12,8 +12,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import scipy.ndimage.measurements as scipymeas
 
-from moviepy.editor import VideoFileClip
-import sys
+#from moviepy.editor import VideoFileClip
+#import sys
 
 # Import file in semantic segmentation to automatize labeling
 # sys.path.append("../semantic_segmentation")
@@ -82,6 +82,9 @@ class BM():
         self.crop_right = -100
         self.crop_top = 0
         self.crop_bottom = 700
+
+        # Distance calibration (scale multiplier to be calibrated)
+        self.scale_multiplier = 7/1.65
 
         # Create matchers
         self._create_matchers()
@@ -344,10 +347,16 @@ class BM():
 
             # Change some signs to turn points 180 deg around x-axis so that y-axis looks up
             localQ = self.Q.copy()
+            print(localQ)
+            print("Estimated distance between the two cameras: {:4.1f}mm".format(1/localQ[3,2]))
+
+            # Rotate the image upside down for a clearer view in MeshLab
             localQ[1,:] = -1 * localQ[1,:]
             localQ[2,:] = -1 * localQ[2,:]
 
             points = cv2.reprojectImageTo3D(self.disparity_scaled, localQ)
+            points = self.scale_multiplier * points
+
             # Output 3-channel floating-point image of the same size as disparity . Each element of _3dImage(x,y) contains 3D coordinates of the point (x,y) computed from the disparity map.           
             #colors = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)   # I don't think it makes sense, as the disparity is calculated on the remapped image not on imgL
             colors = cv2.cvtColor(self.undistorted_rectified_background,
@@ -364,8 +373,7 @@ class BM():
             sky = np.array([70, 130, 180])
             mask_sky = np.logical_not(np.array(cv2.inRange(colors, sky, sky), dtype=bool))
 
-            #object_mask = np.logical_not(mask_sky)
-            #object_mask = mask_car + mask_person
+            # object_mask = mask_car + mask_person
             object_mask = mask_sky
             mask = np.logical_and(infinity_mask, object_mask)
 
@@ -389,12 +397,11 @@ class BM():
 Object to calculate the stereo calibration necessary to match images using the BM object
 """
 class Calibration():
-    def __init__(self, path, left_template, right_template, toskip=[], save=False):
+    def __init__(self, path, left_template, right_template, toskip=[]):
         
-        # Paths
+        # Path
         self.path = path
-        self.save = save
-    
+
         # Load filenames for images
         self.imagesL = glob.glob(self.path + left_template)
         self.imagesR = glob.glob(self.path + right_template)
@@ -455,8 +462,11 @@ class Calibration():
         cv2.moveWindow(self.windowNameR, self.wsize+100, 0)
 
 
-    def calibrate(self, visual=False, window_timeout=500):
-        
+    def calibrate(self, visual=False, window_timeout=500, save=False):
+
+        # Save or not
+        self.save = save
+
         """
         Intrinsic parameters
         """
@@ -550,14 +560,15 @@ class Calibration():
         # well as calculated the relative camera positions - represented via the fundamental matrix, F
         # alter termination criteria to (perhaps) improve solution - ?
         
-        # Set flags (chubby)
+        # Set flags
+        # Documentation here: https://docs.opencv.org/3.0-beta/modules/calib3d/doc/camera_calibration_and_3d_reconstruction.html#double stereoCalibrate(InputArrayOfArrays objectPoints, InputArrayOfArrays imagePoints1, InputArrayOfArrays imagePoints2, InputOutputArray cameraMatrix1, InputOutputArray distCoeffs1, InputOutputArray cameraMatrix2, InputOutputArray distCoeffs2, Size imageSize, OutputArray R, OutputArray T, OutputArray E, OutputArray F, int flags,TermCriteria criteria)
         flags = 0
-        flags |= cv2.CALIB_FIX_INTRINSIC
+        # flags |= cv2.CALIB_FIX_INTRINSIC
+        # flags |= cv2.CALIB_USE_INTRINSIC_GUESS
         # flags |= cv2.CALIB_FIX_PRINCIPAL_POINT
-        flags |= cv2.CALIB_USE_INTRINSIC_GUESS
-        flags |= cv2.CALIB_FIX_FOCAL_LENGTH
+        # flags |= cv2.CALIB_FIX_FOCAL_LENGTH
         # flags |= cv2.CALIB_FIX_ASPECT_RATIO
-        flags |= cv2.CALIB_ZERO_TANGENT_DIST
+        # flags |= cv2.CALIB_ZERO_TANGENT_DIST
         # flags |= cv2.CALIB_RATIONAL_MODEL
         # flags |= cv2.CALIB_SAME_FOCAL_LENGTH
         # flags |= cv2.CALIB_FIX_K3
@@ -579,7 +590,7 @@ class Calibration():
                                      self.distR,
                                      self.image_size,
                                      criteria=self.termination_criteria_extrinsics,
-                                     flags=0)
+                                     flags=flags)
         
         print("Stereo RMS left to right re-projection error: {}".format(rms_stereo))
 
@@ -634,8 +645,11 @@ if __name__ == '__main__':
 
     calibration_folder = '../videos/20171201_stereo_TMG/calibration_frames/'
     toskip = []
-    test_folder = '../videos/20171201_stereo_TMG/test_frames/'
-    segmented_test_folder = '../videos/20171201_stereo_TMG/test_frames_segmented/'
+    # test_folder = '../videos/20171201_stereo_TMG/test_frames/'
+    test_folder = '../videos/20171201_stereo_TMG/move_i3/'
+    # segmented_test_folder = '../videos/20171201_stereo_TMG/test_frames_segmented/'
+    segmented_test_folder = '../videos/20171201_stereo_TMG/move_i3_segmented/'
+
     CALIBRATE = 0
     TEST = 1
     TUNE = 1
@@ -644,16 +658,17 @@ if __name__ == '__main__':
         cameras = Calibration(calibration_folder,
                           toskip=toskip,
                           left_template='calibration_left_*_cropped.png',
-                          right_template='calibration_right_*_cropped.png',
-                          save=True)
-        cameras.calibrate(visual=True)
+                          right_template='calibration_right_*_cropped.png')
+        cameras.calibrate(visual=True, save=True)
 
     if TEST:
         mycal = pickle.load(open(calibration_folder + "calibration.p", "rb"))
-        fileL = test_folder + 'test_left_013_cropped.png'
-        fileR = test_folder + 'test_right_013_cropped.png'
-        fileB = segmented_test_folder + 'test_left_013_cropped.png'  # to use the segmented image
-        #fileB = fileL  # to use the real photo
+        # fileL = test_folder + 'test_left_013_cropped.png'
+        # fileR = test_folder + 'test_right_013_cropped.png'
+        fileL = test_folder + 'move_left_024_cropped.png'
+        fileR = test_folder + 'move_right_024_cropped.png'
+        #fileB = segmented_test_folder + 'move_left_024_cropped.png'  # to use the segmented image
+        fileB = fileL  # to use the real photo
         imgL = cv2.imread(fileL)
         imgR = cv2.imread(fileR)
         imgB = cv2.imread(fileB)
