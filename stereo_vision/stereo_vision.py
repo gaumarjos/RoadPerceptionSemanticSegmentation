@@ -67,7 +67,7 @@ class BM():
         self.preFilterCap = 31
         
         # Filter in use
-        self.use_wls_filter = 1
+        self.use_wls_filter = 0
 
         # Speckle Filter
         self.speckle_maxSpeckleSize = 4000
@@ -78,13 +78,13 @@ class BM():
         self.wls_sigma = 0.8
 
         # Disparity crop
-        self.crop_left = 100
-        self.crop_right = -100
+        self.crop_left = 200
+        self.crop_right = 1410
         self.crop_top = 0
-        self.crop_bottom = 700
+        self.crop_bottom = 660
 
         # Distance calibration (scale multiplier to be calibrated)
-        self.scale_multiplier = 7/1.65
+        self.distance_calibration_poly = np.asarray([2.57345412e-04, -6.24761506e-01, 3.30567462e+03])
 
         # Create matchers
         self._create_matchers()
@@ -122,7 +122,7 @@ class BM():
                                               speckleRange=self.speckleRange,
                                               preFilterCap=self.preFilterCap
                                               )
-        
+
         if self.use_wls_filter:
             # Create right matcher
             self.matcherR = cv2.ximgproc.createRightMatcher(self.matcherL)
@@ -171,8 +171,29 @@ class BM():
         # Crop
         self.disparity_scaled = self.disparity_scaled[self.crop_top:self.crop_bottom,self.crop_left:self.crop_right]
         self.disparity_size = self.disparity_scaled.shape
-        
+
         return self.disparity_scaled
+
+
+    def calculate_depth_mm(self, disparity):
+        localQ = self.Q.copy()
+        print(localQ)
+        print("Estimated distance between the two cameras: {:4.1f}mm".format(1/localQ[3,2]))
+
+        # Rotate the image upside down for a clearer view in MeshLab
+        localQ[1,:] = -1 * localQ[1,:]
+        localQ[2,:] = -1 * localQ[2,:]
+
+        # Calculate reprojected points
+        points = cv2.reprojectImageTo3D(disparity, localQ)
+
+        # Estimate distance
+        x_points_mm = np.polyval(self.distance_calibration_poly, -points[:,:,0])
+        y_points_mm = np.polyval(self.distance_calibration_poly, -points[:,:,1])
+        z_points_mm = np.polyval(self.distance_calibration_poly, -points[:,:,2])
+        self.points = points #np.dstack((x_points_mm, y_points_mm, z_points_mm))
+
+        return z_points_mm
 
 
     """
@@ -214,11 +235,16 @@ class BM():
         # Display disparity
         cv2.imshow(self.windowNameD, preview)
 
+        # Showing the Z axis in an image
+        fig = plt.figure(1)
+        plt.imshow(self.calculate_depth_mm(self.disparity_scaled), cmap='hot', interpolation='nearest')
+        plt.show()
+
 
     """
     Tuner used to tune stereo matching parameters
     """
-    def tuner(self, imgL, imgR, imgB):
+    def tuner(self, imgL, imgR, imgB, meas_distance=None):
 
         # Pre-process the image that will be used by "_save_cloud_function"
         self.imgL = imgL
@@ -226,7 +252,10 @@ class BM():
         self.undistorted_rectified_background = cv2.remap(imgB, self.mapR1, self.mapR2, interpolation=cv2.INTER_LINEAR)
         
         # Create window
-        self.windowNameD = "SGBM Stereo Disparity"
+        if meas_distance is None:    
+            self.windowNameD = 'SGBM Stereo Disparity'
+        else:
+            self.windowNameD = 'SGBM Stereo Disparity (distance: {})'.format(meas_distance)
         cv2.namedWindow(self.windowNameD, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(self.windowNameD, 1200, 1000)
         cv2.moveWindow(self.windowNameD, 0, 0)
@@ -344,26 +373,15 @@ class BM():
     def _save_cloud_function(self, event, x, y, flags, param):
         if event == cv2.EVENT_RBUTTONDOWN:
             basename = 'disparity'
-
-            # Change some signs to turn points 180 deg around x-axis so that y-axis looks up
-            localQ = self.Q.copy()
-            print(localQ)
-            print("Estimated distance between the two cameras: {:4.1f}mm".format(1/localQ[3,2]))
-
-            # Rotate the image upside down for a clearer view in MeshLab
-            localQ[1,:] = -1 * localQ[1,:]
-            localQ[2,:] = -1 * localQ[2,:]
-
-            points = cv2.reprojectImageTo3D(self.disparity_scaled, localQ)
-            points = self.scale_multiplier * points
-
             # Output 3-channel floating-point image of the same size as disparity . Each element of _3dImage(x,y) contains 3D coordinates of the point (x,y) computed from the disparity map.           
             #colors = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)   # I don't think it makes sense, as the disparity is calculated on the remapped image not on imgL
             colors = cv2.cvtColor(self.undistorted_rectified_background,
                                   cv2.COLOR_BGR2RGB)
             # colors = np.zeros_like(self.undistorted_rectified_background)
             colors = colors[self.crop_top:self.crop_bottom,self.crop_left:self.crop_right]
-            infinity_mask = self.disparity_scaled > self.disparity_scaled.min()
+            # infinity_mask = self.disparity_scaled > self.disparity_scaled.min() # TODO check is this is always 0 or can change
+            infinity_mask = self.disparity_scaled > 0
+            print("Minimum value: {}".format(self.disparity_scaled.min()))
 
             # Mask based on specific labels (color values)
             car = np.array([0, 0, 142])
@@ -377,14 +395,14 @@ class BM():
             object_mask = mask_sky
             mask = np.logical_and(infinity_mask, object_mask)
 
-
+            """
             # Experiment with labelling
             person_points = points[np.logical_and(infinity_mask, mask_person)]
             person_labels = scipymeas.label(person_points)
             print(person_labels)
+            """
 
-
-            out_points = points[mask]
+            out_points = self.points[mask]
             out_colors = colors[mask]
             while os.path.isfile(basename + '.ply'):
                 basename = basename + '_'
@@ -517,7 +535,7 @@ class Calibration():
                 self.objpoints.append(objp)
                 chessboard_pattern_detections_accepted += 1
 
-        print("Total number of accepted images: {}".format(chessboard_pattern_detections_accepted))
+        print("{} images were accepted, now using them to calibrate each camera separately...".format(chessboard_pattern_detections_accepted))
 
         # Perform calibration on both cameras - uses [Zhang, 2000]
         ret, self.mtxL, self.distL, self.rvecsL, self.tvecsL = cv2.calibrateCamera(self.objpoints, self.imgpointsL, self.image_size, None, None)
@@ -525,6 +543,7 @@ class Calibration():
 
         # Check results
         if visual:
+            print("Now showing the same images undistorted to check if everything makes sense...")
             for i in range(len(self.imagesL)):
                 imgL = cv2.imread(self.imagesL[i])
                 imgR = cv2.imread(self.imagesR[i])
@@ -544,14 +563,14 @@ class Calibration():
             imgpointsL2, _ = cv2.projectPoints(self.objpoints[i], self.rvecsL[i], self.tvecsL[i], self.mtxL, self.distL)
             errorL = cv2.norm(self.imgpointsL[i], imgpointsL2, cv2.NORM_L2)/len(imgpointsL2)
             tot_errorL += errorL
-        print("LEFT: Re-projection error: ", tot_errorL/len(self.objpoints))
+        print("Left re-projection error: ", tot_errorL/len(self.objpoints))
 
         tot_errorR = 0
         for i in range(len(self.objpoints)):
             imgpointsR2, _ = cv2.projectPoints(self.objpoints[i], self.rvecsR[i], self.tvecsR[i], self.mtxR, self.distR)
             errorR = cv2.norm(self.imgpointsR[i],imgpointsR2, cv2.NORM_L2)/len(imgpointsR2)
             tot_errorR += errorR
-        print("RIGHT: Re-projection error: ", tot_errorR/len(self.objpoints))
+        print("Right re-projection error: ", tot_errorR/len(self.objpoints))
 
         """
         Extrinsic parameters
@@ -608,10 +627,10 @@ class Calibration():
         # compute the pixel mappings to the rectified versions of the images
         self.mapL1, self.mapL2 = cv2.initUndistortRectifyMap(self.camera_matrix_l, self.dist_coeffs_l, RL, PL, self.image_size, cv2.CV_32FC1)
         self.mapR1, self.mapR2 = cv2.initUndistortRectifyMap(self.camera_matrix_r, self.dist_coeffs_r, RR, PR, self.image_size, cv2.CV_32FC1)
-        print(self.image_size)
 
         # Check rectification
         if visual:
+            print("Now showing the same images undistorted and recified to check if everything makes sense...")
             for i in range(len(self.imagesL)):
                 imgL = cv2.imread(self.imagesL[i])
                 imgR = cv2.imread(self.imagesR[i])
@@ -641,12 +660,14 @@ class Calibration():
 
 if __name__ == '__main__':
 
-    print(cv2.__version__)
+    print("OpenCV version: {}".format(cv2.__version__))
 
-    calibration_folder = '../videos/20171201_stereo_TMG/calibration_frames/'
+    # calibration_folder = '../videos/20171220_stereo_2nd_calibration_at_TMG/calibration_frames/'
+    calibration_folder = '../videos/20171220_stereo_2nd_calibration_at_TMG/calibration_frames_small/'
     toskip = []
     # test_folder = '../videos/20171201_stereo_TMG/test_frames/'
-    test_folder = '../videos/20171201_stereo_TMG/move_i3/'
+    # test_folder = '../videos/20171220_stereo_2nd_calibration_at_TMG/distance_indoor_frames/'
+    test_folder = '../videos/20171220_stereo_2nd_calibration_at_TMG/distance_outdoor_frames/'
     # segmented_test_folder = '../videos/20171201_stereo_TMG/test_frames_segmented/'
     segmented_test_folder = '../videos/20171201_stereo_TMG/move_i3_segmented/'
 
@@ -656,17 +677,17 @@ if __name__ == '__main__':
 
     if CALIBRATE:
         cameras = Calibration(calibration_folder,
-                          toskip=toskip,
-                          left_template='calibration_left_*_cropped.png',
-                          right_template='calibration_right_*_cropped.png')
+                              toskip=toskip,
+                              left_template='calibration_left_*_cropped.png',
+                              right_template='calibration_right_*_cropped.png')
         cameras.calibrate(visual=True, save=True)
 
     if TEST:
         mycal = pickle.load(open(calibration_folder + "calibration.p", "rb"))
         # fileL = test_folder + 'test_left_013_cropped.png'
         # fileR = test_folder + 'test_right_013_cropped.png'
-        fileL = test_folder + 'move_left_024_cropped.png'
-        fileR = test_folder + 'move_right_024_cropped.png'
+        fileL = test_folder + 'distance_outdoor_left_005_cropped.png'
+        fileR = test_folder + 'distance_outdoor_right_005_cropped.png'
         #fileB = segmented_test_folder + 'move_left_024_cropped.png'  # to use the segmented image
         fileB = fileL  # to use the real photo
         imgL = cv2.imread(fileL)
