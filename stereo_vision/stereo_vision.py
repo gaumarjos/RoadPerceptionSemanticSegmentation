@@ -67,15 +67,15 @@ class BM():
         self.preFilterCap = 31
         
         # Filter in use
-        self.use_wls_filter = 0
+        self.use_wls_filter = 1
 
         # Speckle Filter
         self.speckle_maxSpeckleSize = 4000
         self.speckle_maxDiff = 64
 
         # WLS Filter
-        self.wls_lambda = 100000
-        self.wls_sigma = 0.8
+        self.wls_lambda = 500000
+        self.wls_sigma = 1.2
 
         # Disparity crop
         self.crop_left = 200
@@ -188,10 +188,11 @@ class BM():
         points = cv2.reprojectImageTo3D(disparity, localQ)
 
         # Estimate distance
-        x_points_mm = np.polyval(self.distance_calibration_poly, -points[:,:,0])
-        y_points_mm = np.polyval(self.distance_calibration_poly, -points[:,:,1])
+        #x_points_mm = np.polyval(self.distance_calibration_poly, points[:,:,0])
+        #y_points_mm = np.polyval(self.distance_calibration_poly, points[:,:,1])
         z_points_mm = np.polyval(self.distance_calibration_poly, -points[:,:,2])
-        self.points = points #np.dstack((x_points_mm, y_points_mm, z_points_mm))
+        self.points = points
+        #self.points = np.dstack((x_points_mm, y_points_mm, z_points_mm))
 
         return z_points_mm
 
@@ -204,7 +205,7 @@ class BM():
         self._create_matchers()
         _ = self.calculate_disparity(imgL, imgR)
 
-        # Write preview
+        # Display disparity
         preview = self.disparity_scaled.copy()
         interline_px = 35
         text = 'minDisparity: {}'.format(self.minDisparity)
@@ -231,14 +232,14 @@ class BM():
         cv2.putText(preview, text, (10,25+10*interline_px), cv2.FONT_HERSHEY_SIMPLEX, 1, 255, 2, 8)
         text = 'wls_sigma: {}'.format(self.wls_sigma)
         cv2.putText(preview, text, (10,25+11*interline_px), cv2.FONT_HERSHEY_SIMPLEX, 1, 255, 2, 8)
-
-        # Display disparity
         cv2.imshow(self.windowNameD, preview)
 
-        # Showing the Z axis in an image
+        # Display depth
         fig = plt.figure(1)
-        plt.imshow(self.calculate_depth_mm(self.disparity_scaled), cmap='hot', interpolation='nearest')
+        plt.ion()
         plt.show()
+        plt.imshow(self.calculate_depth_mm(self.disparity_scaled), cmap='hot', interpolation='nearest')
+        plt.pause(0.001)
 
 
     """
@@ -260,7 +261,7 @@ class BM():
         cv2.resizeWindow(self.windowNameD, 1200, 1000)
         cv2.moveWindow(self.windowNameD, 0, 0)
         cv2.createTrackbar("minDisparity", self.windowNameD, self.minDisparity, 100, self._change_minDisparity)
-        cv2.createTrackbar("numDisparities (*16)", self.windowNameD, int(self.numDisparities/16), 16, self._change_numDisparities)
+        cv2.createTrackbar("numDisparities (*16)", self.windowNameD, int(self.numDisparities/16), 64, self._change_numDisparities)
         cv2.createTrackbar("blockSize", self.windowNameD, self.blockSize, 21, self._change_blockSize)
         cv2.createTrackbar("P1", self.windowNameD, self.P1, 10000, self._change_P1)
         cv2.createTrackbar("P2", self.windowNameD, self.P2, 10000, self._change_P2)
@@ -686,8 +687,8 @@ if __name__ == '__main__':
         mycal = pickle.load(open(calibration_folder + "calibration.p", "rb"))
         # fileL = test_folder + 'test_left_013_cropped.png'
         # fileR = test_folder + 'test_right_013_cropped.png'
-        fileL = test_folder + 'distance_outdoor_left_005_cropped.png'
-        fileR = test_folder + 'distance_outdoor_right_005_cropped.png'
+        fileL = test_folder + 'distance_outdoor_left_004_cropped.png'
+        fileR = test_folder + 'distance_outdoor_right_004_cropped.png'
         #fileB = segmented_test_folder + 'move_left_024_cropped.png'  # to use the segmented image
         fileB = fileL  # to use the real photo
         imgL = cv2.imread(fileL)
@@ -700,7 +701,8 @@ if __name__ == '__main__':
             block_matcher.tuner(imgL, imgR, imgB)
 
         if not TUNE:
-            cv2.imshow("ciao", block_matcher.calculate_disparity(imgL, imgR))
-            key = cv2.waitKey(0)
-            cv2.destroyAllWindows()
-
+            disparity = block_matcher.calculate_disparity(imgL, imgR)
+            depth = block_matcher.calculate_depth_mm(disparity)
+            fig = plt.figure(1)
+            plt.imshow(depth, cmap='hot', interpolation='nearest')
+            plt.show()
