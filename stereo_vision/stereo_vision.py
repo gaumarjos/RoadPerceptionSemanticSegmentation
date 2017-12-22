@@ -188,10 +188,18 @@ class BM():
         #x_points_mm = np.polyval(self.distance_calibration_poly, points[:,:,0])
         #y_points_mm = np.polyval(self.distance_calibration_poly, points[:,:,1])
         z_points_mm = np.polyval(self.distance_calibration_poly, -points[:,:,2])
+
+        # Prepare infinity mask to avoid MeshLab issues
+        # infinity_mask = disparity > disparity.min() # TODO check is this is always 0 or can change
+        infinity_mask = disparity > 0
+        print("Minimum value: {}".format(disparity.min()))
+
+        # Make global variable to be used by the tuner
         self.points = points
         #self.points = np.dstack((x_points_mm, y_points_mm, z_points_mm))
+        self.infinity_mask = infinity_mask
 
-        return z_points_mm
+        return points, infinity_mask, z_points_mm
 
 
     """
@@ -235,7 +243,8 @@ class BM():
         fig = plt.figure(1)
         plt.ion()
         plt.show()
-        plt.imshow(self.calculate_depth_mm(self.disparity_scaled), cmap='hot', interpolation='nearest')
+        _, _, depth_preview = self.calculate_depth_mm(self.disparity_scaled)
+        plt.imshow(depth_preview, cmap='hot', interpolation='nearest')
         plt.pause(0.001)
 
 
@@ -247,7 +256,7 @@ class BM():
         # Pre-process the image that will be used by "_save_cloud_function"
         self.imgL = imgL
         self.imgR = imgR
-        self.undistorted_rectified_background = cv2.remap(imgB, self.mapR1, self.mapR2, interpolation=cv2.INTER_LINEAR)
+        self.imgB = imgB
         
         # Create window
         if meas_distance is None:    
@@ -341,74 +350,71 @@ class BM():
         self.wls_sigma = value / 10
         self._refresh_preview(self.imgL, self.imgR)
 
-
-    """
-    Internal method to save a point cloud in Meshlab format
-    """
-    def _write_ply(self, fn, verts, colors):
-        ply_header = '''ply
-                        format ascii 1.0
-                        element vertex %(vert_num)d
-                        property float x
-                        property float y
-                        property float z
-                        property uchar red
-                        property uchar green
-                        property uchar blue
-                        end_header
-                        '''
-        verts = verts.reshape(-1, 3)
-        colors = colors.reshape(-1, 3)
-        verts = np.hstack([verts, colors])
-        with open(fn, 'wb') as f:
-            f.write((ply_header % dict(vert_num=len(verts))).encode('utf-8'))
-            np.savetxt(f, verts, fmt='%f %f %f %d %d %d ')
-
-
-    """
-    Internal method to save the point cloud in a format that an be opened by Meshlab
-    """
     def _save_cloud_function(self, event, x, y, flags, param):
         if event == cv2.EVENT_RBUTTONDOWN:
-            basename = 'disparity'
-            # Output 3-channel floating-point image of the same size as disparity . Each element of _3dImage(x,y) contains 3D coordinates of the point (x,y) computed from the disparity map.           
-            #colors = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)   # I don't think it makes sense, as the disparity is calculated on the remapped image not on imgL
-            colors = cv2.cvtColor(self.undistorted_rectified_background,
-                                  cv2.COLOR_BGR2RGB)
-            # colors = np.zeros_like(self.undistorted_rectified_background)
-            colors = colors[self.crop_top:self.crop_bottom,self.crop_left:self.crop_right]
-            # infinity_mask = self.disparity_scaled > self.disparity_scaled.min() # TODO check is this is always 0 or can change
-            infinity_mask = self.disparity_scaled > 0
-            print("Minimum value: {}".format(self.disparity_scaled.min()))
-
-            # Mask based on specific labels (color values)
-            car = np.array([0, 0, 142])
-            mask_car = np.array(cv2.inRange(colors, car, car), dtype=bool)
-            person = np.array([220, 20, 60])
-            mask_person = np.array(cv2.inRange(colors, person, person), dtype=bool)
-            sky = np.array([70, 130, 180])
-            mask_sky = np.logical_not(np.array(cv2.inRange(colors, sky, sky), dtype=bool))
-
-            # object_mask = mask_car + mask_person
-            object_mask = mask_sky
-            mask = np.logical_and(infinity_mask, object_mask)
-
-            """
-            # Experiment with labelling
-            person_points = points[np.logical_and(infinity_mask, mask_person)]
-            person_labels = scipymeas.label(person_points)
-            print(person_labels)
-            """
-
-            out_points = self.points[mask]
-            out_colors = colors[mask]
-            while os.path.isfile(basename + '.ply'):
-                basename = basename + '_'
-            print("Saving point cloud as {}".format(basename + '.ply'))
-            self._write_ply(basename + '.ply', out_points, out_colors)
-            print("Done")
+            self.generate3Dimage(self.points, self.infinity_mask, self.imgB)
+        return
 
 
+    """
+    Method to save the point cloud in a format that an be opened by MeshLab
+    """
+    def generate3Dimage(self, points, infinity_mask, imgB):
+
+        def write_ply(fn, verts, colors):
+            ply_header = '''ply
+                            format ascii 1.0
+                            element vertex %(vert_num)d
+                            property float x
+                            property float y
+                            property float z
+                            property uchar red
+                            property uchar green
+                            property uchar blue
+                            end_header
+                            '''
+            verts = verts.reshape(-1, 3)
+            colors = colors.reshape(-1, 3)
+            verts = np.hstack([verts, colors])
+            with open(fn, 'wb') as f:
+                f.write((ply_header % dict(vert_num=len(verts))).encode('utf-8'))
+                np.savetxt(f, verts, fmt='%f %f %f %d %d %d ')
+
+        basename = 'disparity'
+        undistorted_rectified_background = cv2.remap(imgB, self.mapR1, self.mapR2, interpolation=cv2.INTER_LINEAR)
+        # Output 3-channel floating-point image of the same size as disparity . Each element of _3dImage(x,y) contains 3D coordinates of the point (x,y) computed from the disparity map.
+        #colors = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)   # I don't think it makes sense, as the disparity is calculated on the remapped image not on imgL
+        colors = cv2.cvtColor(undistorted_rectified_background,
+                              cv2.COLOR_BGR2RGB)
+        colors = colors[self.crop_top:self.crop_bottom,self.crop_left:self.crop_right]
+
+        # Mask based on specific labels (color values)
+        car = np.array([0, 0, 142])
+        mask_car = np.array(cv2.inRange(colors, car, car), dtype=bool)
+        person = np.array([220, 20, 60])
+        mask_person = np.array(cv2.inRange(colors, person, person), dtype=bool)
+        sky = np.array([70, 130, 180])
+        mask_sky = np.logical_not(np.array(cv2.inRange(colors, sky, sky), dtype=bool))
+
+        # object_mask = mask_car + mask_person
+        object_mask = mask_sky
+        mask = np.logical_and(infinity_mask, object_mask)
+
+        """
+        # Experiment with labelling
+        person_points = points[np.logical_and(infinity_mask, mask_person)]
+        person_labels = scipymeas.label(person_points)
+        print(person_labels)
+        """
+
+        out_points = self.points[mask]
+        out_colors = colors[mask]
+        while os.path.isfile(basename + '.ply'):
+            basename = basename + '_'
+        print("Saving point cloud as {}".format(basename + '.ply'))
+        write_ply(basename + '.ply', out_points, out_colors)
+        print("Done")
+        return
 
 
 if __name__ == '__main__':
@@ -440,8 +446,12 @@ if __name__ == '__main__':
         block_matcher.tuner(imgL, imgR, imgB)
 
     if not TUNE:
+        # Calculate
         disparity = block_matcher.calculate_disparity(imgL, imgR)
-        depth = block_matcher.calculate_depth_mm(disparity)
+        points, infinity_mask, z_points_mm = block_matcher.calculate_depth_mm(disparity)
+        block_matcher.generate3Dimage(points, infinity_mask, imgB)
+
+        # Show
         fig = plt.figure(1)
-        plt.imshow(depth, cmap='hot', interpolation='nearest')
+        plt.imshow(z_points_mm, cmap='hot', interpolation='nearest')
         plt.show()
