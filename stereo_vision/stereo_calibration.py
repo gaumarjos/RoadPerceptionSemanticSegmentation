@@ -263,12 +263,15 @@ class Calibration():
 if __name__ == '__main__':        
     print("OpenCV version: {}".format(cv2.__version__))
     
-    # calibration_folder = '../videos/20171220_stereo_2nd_calibration_at_TMG/calibration_frames/'
-    calibration_folder = '../videos/20171220_stereo_2nd_calibration_at_TMG/calibration_frames_small/'
+    # calibration_folder = '../videos/20171220_stereo_120_calibration_2/calibration_frames/'
+    # calibration_folder = '../videos/20171220_stereo_120_calibration_2/calibration_frames_small/'
+    calibration_folder = '../videos/20180109_stereo_60_calibration/calibration_frames/'
     toskip = []
 
     cameras = Calibration(calibration_folder,
                           toskip=toskip,
-                          left_template='calibration_left_*_cropped.png',
-                          right_template='calibration_right_*_cropped.png')
-    cameras.calibrate(visual=True, save=False)
+                          #left_template='calibration_left_*_cropped.png',
+                          #right_template='calibration_right_*_cropped.png')
+                          left_template='calibration_left_*.png',
+                          right_template='calibration_right_*.png')
+    cameras.calibrate(visual=True, save=True)

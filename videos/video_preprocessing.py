@@ -52,6 +52,7 @@ def extract_frames_from_video(folder, input_folder, left_basename, right_basenam
 
     for i, t in enumerate(frame_secs):
         i_label = i
+        print('frame {}'.format(i))
         left_name = folder + output_folder + "{}_{:03d}.png".format(left_basename, i_label+i_start)
         right_name = folder + output_folder  + "{}_{:03d}.png".format(right_basename, i_label+i_start)
         left_clip.save_frame(left_name, t=t)
@@ -104,19 +105,42 @@ frame_secs = [2, 14, 27, 30, 36, 47, 54, 60+3]
 
 # Relative to folder 20171201_stereo_2nd_calibration_at_TMG
 if 1:
-    i=240
+    master_folder = '20180109_stereo_60_calibration/'
+
+    """
+    extract_frames_from_video(master_folder,
+                              input_folder='calibration_videos/',
+                              left_basename='calibration_left',
+                              right_basename='calibration_right',
+                              frame_secs=[0, 7, 11, 15, 21, 32, 37, 46, 49, 60+1, 60+15, 60+20, 60+23, 60+28, 60+34, 60+39, 60+43, 60+47, 60+52, 60+58, 60+59, 120+6, 120+12, 120+15, 120+19, 120+25, 120+30, 120+32, 120+37, 120+40, 120+43, 120+53, 120+56, 180+0, 180+4, 180+8, 180+12, 180+16, 180+23, 180+24, 180+26, 180+31, 180+37, 180+39,180+41, 180+43, 180+45, 180+47, 180+52, 180+57, 180+59, 240+1, 240+5, 240+7, 240+9, 240+11, 240+13, 240+15, 240+17, 240+19, 240+21, 240+23, 240+25, 240+27, 240+29, 240+35, 240+39, 240+42, 240+44, 240+46, 240+48, 240+55], # BIG BOARD Closer from 180+23
+                              i_start=1,
+                              output_folder='calibration_frames/',
+                              preprocess=0)
+    """
+
+    extract_frames_from_video(master_folder,
+                              input_folder='distance_videos/',
+                              left_basename='distance_left',
+                              right_basename='distance_right',
+                              frame_secs=[1, 9, 18, 32, 44, 58, 1*60+13, 1*60+32, 1*60+57, 2*60+10, 3*60+40, 3*60+52, 4*60+5, 4*60+36, 4*60+54, 5*60+12, 6*60+18, 7*60+22, 7*60+44, 8*60+0, 8*60+17, 8*60+32, 8*60+40, 8*60+51, 9*60+1, 9*60+10, 9*60+24],
+                              i_start=0,
+                              output_folder='distance_frames/',
+                              preprocess=0)
+
+"""
     master_folder = '20171220_stereo_2nd_calibration_at_TMG/'
+    i=240
     extract_frames_from_video(master_folder,
                               input_folder='calibration_videos/',
                               left_basename='calibration_left',
                               right_basename='calibration_right',
                               #frame_secs=[3, 9, 18, 34, 38, 41, 48, 52, 54, 56, 60, 60+5, 60+9, 60+15, 60+18, 60+21, 60+24,  60+27, 60+30, 60+33, 60+36, 60+41, 60+44, 60+47, 60+50, 60+53, 60+56, 60+60, 60+64, 60+70, 60+74, 60+77, 60+83, 60+86, 60+90, 60+93, 60+98, 60+103, 60+107, 180+8, 180+12, 180+16, 180+20, 180+26, 180+29, 180+32, 180+39, 180+42, 180+47, 180+50], # BIG BOARD
-                              frame_secs=[i+27, i+31, i+34, i+37, i+40, i+46, i+49, i+54, i+57, i+60, i+63, i+65, i+68, i+71, i+74, i+77, i+79, i+82, i+86, i+90, i+94, i+96, i+99, i+103, i+106, i+109, i+113, i+120, i+124, i+127, i+129, i+138, i+140, i+146, i+149, i+151, i+153, i+165], # schmall BOARD
+                              #frame_secs=[i+27, i+31, i+34, i+37, i+40, i+46, i+49, i+54, i+57, i+60, i+63, i+65, i+68, i+71, i+74, i+77, i+79, i+82, i+86, i+90, i+94, i+96, i+99, i+103, i+106, i+109, i+113, i+120, i+124, i+127, i+129, i+138, i+140, i+146, i+149, i+151, i+153, i+165], # schmall BOARD
                               i_start=1,
                               output_folder='calibration_frames_small/',
                               preprocess=1)
 
-"""
+
     extract_frames_from_video(master_folder,
                               input_folder='distance_indoor_videos/',
                               left_basename='distance_indoor_left',

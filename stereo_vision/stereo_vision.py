@@ -51,12 +51,12 @@ class BM():
     """
     def __init__(self, calibration):
         # Matcher
-        window_size = 5
+        window_size = 7 # used to be 5
         self.minDisparity = 0
         self.numDisparities = 128
-        self.blockSize = window_size  # old SADWindowSize
-        self.P1 = 8 * 3 * window_size**2
-        self.P2 = 32 * 3 * window_size**2
+        self.blockSize = window_size  # the old SADWindowSize
+        self.P1 = 8 * 3 * 11**2  # used to be window_size**2 as suggested in the documentation
+        self.P2 = 32 * 3 * 11**2
         self.disp12MaxDiff = 1
         self.uniquenessRatio = 10
         self.speckleWindowSize = 100
@@ -75,10 +75,17 @@ class BM():
         self.wls_sigma = 1.2
 
         # Disparity crop
+        """
         self.crop_left = 200
         self.crop_right = 1410
         self.crop_top = 0
         self.crop_bottom = 660
+        """
+
+        self.crop_left = 130
+        self.crop_right = 1860
+        self.crop_top = 60
+        self.crop_bottom = 1160
 
         # Distance calibration (scale multiplier to be calibrated)
         self.distance_calibration_poly = np.asarray([2.57345412e-04, -6.24761506e-01, 3.30567462e+03])
@@ -381,6 +388,11 @@ class BM():
                 np.savetxt(f, verts, fmt='%f %f %f %d %d %d ')
 
         basename = 'disparity'
+        
+        # Translate and rectify the background image to fit the depth map and  
+        Tmatrix = np.float32([[1,0,-40],[0,1,0]])
+        rows, cols, _ = imgB.shape
+        imgB = cv2.warpAffine(imgB, Tmatrix, (cols,rows))
         undistorted_rectified_background = cv2.remap(imgB, self.mapR1, self.mapR2, interpolation=cv2.INTER_LINEAR)
         # Output 3-channel floating-point image of the same size as disparity . Each element of _3dImage(x,y) contains 3D coordinates of the point (x,y) computed from the disparity map.
         #colors = cv2.cvtColor(imgL, cv2.COLOR_BGR2RGB)   # I don't think it makes sense, as the disparity is calculated on the remapped image not on imgL
@@ -420,26 +432,26 @@ class BM():
 if __name__ == '__main__':
     print("OpenCV version: {}".format(cv2.__version__))
 
-    calibration_folder = '../videos/20171220_stereo_2nd_calibration_at_TMG/calibration_frames_small/'
-    # test_folder = '../videos/20171201_stereo_TMG/test_frames/'
-    # test_folder = '../videos/20171220_stereo_2nd_calibration_at_TMG/distance_indoor_frames/'
-    test_folder = '../videos/20171220_stereo_2nd_calibration_at_TMG/distance_outdoor_frames/'
+    calibration_folder = '../videos/20180109_stereo_60_calibration/calibration_frames/'
+    test_folder = '../videos/20180109_stereo_60_calibration/distance_frames/'
+
+    # test_folder = '../videos/20171201_stereo_120_calibration_1/test_frames/'
+    # test_folder = '../videos/20171220_stereo_120_calibration_2/distance_indoor_frames/'
+    # test_folder = '../videos/20171220_stereo_120_calibration_2/distance_outdoor_frames/'
+    
     # segmented_test_folder = '../videos/20171201_stereo_TMG/test_frames_segmented/'
-    segmented_test_folder = '../videos/20171201_stereo_TMG/move_i3_segmented/'
+    # segmented_test_folder = '../videos/20171201_stereo_TMG/move_i3_segmented/'
 
     TUNE = 1
 
     mycal = pickle.load(open(calibration_folder + "calibration.p", "rb"))
-    # fileL = test_folder + 'test_left_013_cropped.png'
-    # fileR = test_folder + 'test_right_013_cropped.png'
-    fileL = test_folder + 'distance_outdoor_left_004_cropped.png'
-    fileR = test_folder + 'distance_outdoor_right_004_cropped.png'
+    fileL = test_folder + 'distance_left_003.png'
+    fileR = test_folder + 'distance_right_003.png'
     #fileB = segmented_test_folder + 'move_left_024_cropped.png'  # to use the segmented image
     fileB = fileL  # to use the real photo
     imgL = cv2.imread(fileL)
     imgR = cv2.imread(fileR)
     imgB = cv2.imread(fileB)
-    imgB = cv2.resize(imgB, (1440, 896))# (320, 512)
 
     block_matcher = BM(mycal)
     if TUNE:
