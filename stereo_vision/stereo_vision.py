@@ -49,14 +49,14 @@ class BM():
     """
     Initialization
     """
-    def __init__(self, calibration):
+    def __init__(self, calibration, disparity_crop=[0, -1, 0, -1], distance_calibration_poly=np.asarray([0, 1, 0])):
         # Matcher
-        window_size = 7 # used to be 5
+        window_size = 5 # used to be 5
         self.minDisparity = 0
         self.numDisparities = 128
         self.blockSize = window_size  # the old SADWindowSize
-        self.P1 = 8 * 3 * 11**2  # used to be window_size**2 as suggested in the documentation
-        self.P2 = 32 * 3 * 11**2
+        self.P1 = 8 * 3 * (window_size+0)**2  # used to be window_size**2 as suggested in the documentation
+        self.P2 = 32 * 3 * (window_size+0)**2
         self.disp12MaxDiff = 1
         self.uniquenessRatio = 10
         self.speckleWindowSize = 100
@@ -75,20 +75,13 @@ class BM():
         self.wls_sigma = 1.2
 
         # Disparity crop
-        """
-        self.crop_left = 200
-        self.crop_right = 1410
-        self.crop_top = 0
-        self.crop_bottom = 660
-        """
+        self.crop_left = disparity_crop[0]
+        self.crop_right = disparity_crop[1]
+        self.crop_top = disparity_crop[2]
+        self.crop_bottom = disparity_crop[3]
 
-        self.crop_left = 130
-        self.crop_right = 1860
-        self.crop_top = 60
-        self.crop_bottom = 1160
-
-        # Distance calibration (scale multiplier to be calibrated)
-        self.distance_calibration_poly = np.asarray([2.57345412e-04, -6.24761506e-01, 3.30567462e+03])
+        # Distance calibration polynomial
+        self.distance_calibration_poly = distance_calibration_poly
 
         # Create matchers
         self._create_matchers()
@@ -124,7 +117,8 @@ class BM():
                                               uniquenessRatio=self.uniquenessRatio,
                                               speckleWindowSize=self.speckleWindowSize,
                                               speckleRange=self.speckleRange,
-                                              preFilterCap=self.preFilterCap
+                                              preFilterCap=self.preFilterCap,
+                                              #mode=cv2.StereoSGBM_MODE_HH,
                                               )
 
         if self.use_wls_filter:
@@ -156,8 +150,8 @@ class BM():
             disparityR = self.matcherR.compute(grayR, grayL)
 
             # Experiment: filter the smaller speckles before using the WLS filter to avoid creating artifacts
-            cv2.filterSpeckles(disparityL, 0, self.speckle_maxSpeckleSize, self.speckle_maxDiff)
-            cv2.filterSpeckles(disparityR, 0, self.speckle_maxSpeckleSize, self.speckle_maxDiff)
+            # cv2.filterSpeckles(disparityL, 0, self.speckle_maxSpeckleSize, self.speckle_maxDiff)
+            # cv2.filterSpeckles(disparityR, 0, self.speckle_maxSpeckleSize, self.speckle_maxDiff)
 
             disparity_filtered = self.wls_filter.filter(np.int16(disparityL / 16.), undistorted_rectifiedL, None, np.int16(disparityR / 16.))
             disparity_filtered = cv2.normalize(src=disparity_filtered, dst=disparity_filtered, beta=0, alpha=255, norm_type=cv2.NORM_MINMAX)
@@ -165,7 +159,7 @@ class BM():
             self.disparity_scaled = disparity_filtered
         else:
             # Unfiltered
-            cv2.filterSpeckles(disparityL, 0, self.speckle_maxSpeckleSize, self.speckle_maxDiff)
+            #cv2.filterSpeckles(disparityL, 0, self.speckle_maxSpeckleSize, self.speckle_maxDiff)
             self.disparity_scaled = (disparityL / 16.).astype(np.uint8) + abs(disparityL.min())
 
         #B = 200  # distance between images, in mm
@@ -283,8 +277,8 @@ class BM():
         cv2.createTrackbar("speckleWindowSize", self.windowNameD, self.speckleWindowSize, 1000, self._change_speckleWindowSize)
         cv2.createTrackbar("speckleRange", self.windowNameD, self.speckleRange, 100, self._change_speckleRange)
         cv2.createTrackbar("preFilterCap", self.windowNameD, self.preFilterCap, 100, self._change_preFilterCap)
-        cv2.createTrackbar("speckle_maxSpeckleSize", self.windowNameD, self.speckle_maxSpeckleSize, 10000, self._change_speckle_maxSpeckleSize)
-        cv2.createTrackbar("speckle_maxDiff", self.windowNameD, self.speckle_maxDiff, 256, self._change_speckle_maxDiff)
+        #cv2.createTrackbar("speckle_maxSpeckleSize", self.windowNameD, self.speckle_maxSpeckleSize, 10000, self._change_speckle_maxSpeckleSize)
+        #cv2.createTrackbar("speckle_maxDiff", self.windowNameD, self.speckle_maxDiff, 256, self._change_speckle_maxDiff)
         cv2.createTrackbar("wls_lambda (/1000)", self.windowNameD, int(self.wls_lambda/1000), 1000, self._change_wls_lambda)
         cv2.createTrackbar("wls_sigma (/10)", self.windowNameD, int(self.wls_sigma*10), 40, self._change_wls_sigma)
         cv2.setMouseCallback(self.windowNameD, self._save_cloud_function)  # Right click on the image to save the point cloud
@@ -388,8 +382,8 @@ class BM():
                 np.savetxt(f, verts, fmt='%f %f %f %d %d %d ')
 
         basename = 'disparity'
-        
-        # Translate and rectify the background image to fit the depth map and  
+
+        # Translate and rectify the background image to fit the depth map
         Tmatrix = np.float32([[1,0,-40],[0,1,0]])
         rows, cols, _ = imgB.shape
         imgB = cv2.warpAffine(imgB, Tmatrix, (cols,rows))
@@ -432,28 +426,35 @@ class BM():
 if __name__ == '__main__':
     print("OpenCV version: {}".format(cv2.__version__))
 
-    calibration_folder = '../videos/20180109_stereo_60_calibration/calibration_frames/'
-    test_folder = '../videos/20180109_stereo_60_calibration/distance_frames/'
+    # 120deg cameras
+    if 0:
+        calibration_folder = '../videos/20171220_stereo_120_calibration_2/calibration_frames_small/'
+        test_folder = '../videos/20171220_stereo_120_calibration_2/distance_outdoor_frames/'
+        fileL = test_folder + 'distance_outdoor_left_003_cropped.png'
+        fileR = test_folder + 'distance_outdoor_right_003_cropped.png'
+        disparity_crop = [200, 1410, 0, 660]
+        distance_calibration_poly = np.asarray([2.57345412e-04, -6.24761506e-01, 3.30567462e+03])
 
-    # test_folder = '../videos/20171201_stereo_120_calibration_1/test_frames/'
-    # test_folder = '../videos/20171220_stereo_120_calibration_2/distance_indoor_frames/'
-    # test_folder = '../videos/20171220_stereo_120_calibration_2/distance_outdoor_frames/'
-    
-    # segmented_test_folder = '../videos/20171201_stereo_TMG/test_frames_segmented/'
-    # segmented_test_folder = '../videos/20171201_stereo_TMG/move_i3_segmented/'
+    if 1:
+        calibration_folder = '../videos/20180109_stereo_60_calibration/calibration_frames/'
+        test_folder = '../videos/20180109_stereo_60_calibration/distance_frames/'
+        fileL = test_folder + 'distance_left_007.png'
+        fileR = test_folder + 'distance_right_007.png'
+        disparity_crop = [130, 1860, 60, 1160]
+        distance_calibration_poly = np.asarray([0, 1, 0])
 
     TUNE = 1
 
-    mycal = pickle.load(open(calibration_folder + "calibration.p", "rb"))
-    fileL = test_folder + 'distance_left_003.png'
-    fileR = test_folder + 'distance_right_003.png'
     #fileB = segmented_test_folder + 'move_left_024_cropped.png'  # to use the segmented image
     fileB = fileL  # to use the real photo
     imgL = cv2.imread(fileL)
     imgR = cv2.imread(fileR)
     imgB = cv2.imread(fileB)
 
-    block_matcher = BM(mycal)
+    mycal = pickle.load(open(calibration_folder + "calibration.p", "rb"))
+    block_matcher = BM(calibration=mycal,
+                       disparity_crop=disparity_crop,
+                       distance_calibration_poly=distance_calibration_poly)
     if TUNE:
         block_matcher.tuner(imgL, imgR, imgB)
 

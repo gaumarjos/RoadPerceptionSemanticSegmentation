@@ -59,13 +59,21 @@ def extract_frames_from_video(folder, input_folder, left_basename, right_basenam
         right_clip.save_frame(right_name, t=t)
         
         # Create preprocessed version if needed
-        if preprocess:
+        if preprocess==1:
             left = cv2.imread(left_name)
             right = cv2.imread(right_name)
             left_cropped = crop_and_resize(left)
             right_cropped = crop_and_resize(right)
             cv2.imwrite(left_name[:-4] + "_cropped.png", left_cropped)
             cv2.imwrite(right_name[:-4] + "_cropped.png", right_cropped)
+
+        if preprocess==2:
+            left = cv2.imread(left_name)
+            right = cv2.imread(right_name)
+            left_resized = cv2.resize(left, (int(1920/2), int(1208/2)), interpolation=cv2.INTER_LINEAR)
+            right_resized = cv2.resize(right, (int(1980/2), int(1208/2)), interpolation=cv2.INTER_LINEAR)
+            cv2.imwrite(left_name[:-4] + "_resized.png", left_resized)
+            cv2.imwrite(right_name[:-4] + "_resized.png", right_resized)
 
 
 def preprocess_video(folder, left_basename, right_basename):
@@ -107,7 +115,6 @@ frame_secs = [2, 14, 27, 30, 36, 47, 54, 60+3]
 if 1:
     master_folder = '20180109_stereo_60_calibration/'
 
-    """
     extract_frames_from_video(master_folder,
                               input_folder='calibration_videos/',
                               left_basename='calibration_left',
@@ -115,8 +122,7 @@ if 1:
                               frame_secs=[0, 7, 11, 15, 21, 32, 37, 46, 49, 60+1, 60+15, 60+20, 60+23, 60+28, 60+34, 60+39, 60+43, 60+47, 60+52, 60+58, 60+59, 120+6, 120+12, 120+15, 120+19, 120+25, 120+30, 120+32, 120+37, 120+40, 120+43, 120+53, 120+56, 180+0, 180+4, 180+8, 180+12, 180+16, 180+23, 180+24, 180+26, 180+31, 180+37, 180+39,180+41, 180+43, 180+45, 180+47, 180+52, 180+57, 180+59, 240+1, 240+5, 240+7, 240+9, 240+11, 240+13, 240+15, 240+17, 240+19, 240+21, 240+23, 240+25, 240+27, 240+29, 240+35, 240+39, 240+42, 240+44, 240+46, 240+48, 240+55], # BIG BOARD Closer from 180+23
                               i_start=1,
                               output_folder='calibration_frames/',
-                              preprocess=0)
-    """
+                              preprocess=2)
 
     extract_frames_from_video(master_folder,
                               input_folder='distance_videos/',
@@ -125,7 +131,7 @@ if 1:
                               frame_secs=[1, 9, 18, 32, 44, 58, 1*60+13, 1*60+32, 1*60+57, 2*60+10, 3*60+40, 3*60+52, 4*60+5, 4*60+36, 4*60+54, 5*60+12, 6*60+18, 7*60+22, 7*60+44, 8*60+0, 8*60+17, 8*60+32, 8*60+40, 8*60+51, 9*60+1, 9*60+10, 9*60+24],
                               i_start=0,
                               output_folder='distance_frames/',
-                              preprocess=0)
+                              preprocess=2)
 
 """
     master_folder = '20171220_stereo_2nd_calibration_at_TMG/'

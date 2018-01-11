@@ -17,7 +17,7 @@ import scipy.ndimage.measurements as scipymeas
 Object to calculate the stereo calibration necessary to match images using the BM object
 """
 class Calibration():
-    def __init__(self, path, left_template, right_template, toskip=[]):
+    def __init__(self, path, left_template, right_template, square_size_in_mm=100, toskip=[]):
         
         # Path
         self.path = path
@@ -57,7 +57,7 @@ class Calibration():
         # Pattern specs
         self.patternX = 6
         self.patternY = 9
-        self.square_size_in_mm = 40
+        self.square_size_in_mm = square_size_in_mm
 
         # Arrays to store object points and image points from all the images
         self.objpoints = [] # 3d point in real world space
@@ -82,7 +82,7 @@ class Calibration():
         cv2.moveWindow(self.windowNameR, self.wsize+100, 0)
 
 
-    def calibrate(self, visual=False, window_timeout=500, save=False):
+    def calibrate(self, visual=False, window_timeout=100, save=False):
 
         # Save or not
         self.save = save
@@ -256,7 +256,7 @@ class Calibration():
                                  "mapR2": self.mapR2,
                                  "Q": Q}
             pickle.dump(self.calibration, open(self.path + self.calibration_filename, "wb"))
-
+https://nerian.com/support/resources/calculator/
         return
         
 
@@ -268,10 +268,12 @@ if __name__ == '__main__':
     calibration_folder = '../videos/20180109_stereo_60_calibration/calibration_frames/'
     toskip = []
 
+    # square_size_in_mm = 40 when using the A3 checkerboard, 100 when using the A0 checkerboard
     cameras = Calibration(calibration_folder,
                           toskip=toskip,
                           #left_template='calibration_left_*_cropped.png',
                           #right_template='calibration_right_*_cropped.png')
                           left_template='calibration_left_*.png',
-                          right_template='calibration_right_*.png')
+                          right_template='calibration_right_*.png',
+                          square_size_in_mm=100)
     cameras.calibrate(visual=True, save=True)
