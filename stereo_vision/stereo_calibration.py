@@ -263,9 +263,10 @@ https://nerian.com/support/resources/calculator/
 if __name__ == '__main__':        
     print("OpenCV version: {}".format(cv2.__version__))
     
-    # calibration_folder = '../videos/20171220_stereo_120_calibration_2/calibration_frames/'
-    # calibration_folder = '../videos/20171220_stereo_120_calibration_2/calibration_frames_small/'
-    calibration_folder = '../videos/20180109_stereo_60_calibration/calibration_frames/'
+    # calibration_folder = '../videos/20171220_stereo_calibration_120deg_2/calibration_frames/'
+    # calibration_folder = '../videos/20171220_stereo_calibration_120deg_2/calibration_frames_small/'
+    # calibration_folder = '../videos/20180109_stereo_calibration_60deg_250mm/calibration_frames/'
+    calibration_folder = '../videos/20180111_stereo_calibration_60deg_120mm/calibration_frames/'
     toskip = []
 
     # square_size_in_mm = 40 when using the A3 checkerboard, 100 when using the A0 checkerboard

@@ -427,20 +427,28 @@ if __name__ == '__main__':
     print("OpenCV version: {}".format(cv2.__version__))
 
     # 120deg cameras
-    if 0:
-        calibration_folder = '../videos/20171220_stereo_120_calibration_2/calibration_frames_small/'
-        test_folder = '../videos/20171220_stereo_120_calibration_2/distance_outdoor_frames/'
+    if 1:
+        calibration_folder = '../videos/20171220_stereo_calibration_120deg_2/calibration_frames_small/'
+        test_folder = '../videos/20171220_stereo_calibration_120deg_2/distance_outdoor_frames/'
         fileL = test_folder + 'distance_outdoor_left_003_cropped.png'
         fileR = test_folder + 'distance_outdoor_right_003_cropped.png'
         disparity_crop = [200, 1410, 0, 660]
         distance_calibration_poly = np.asarray([2.57345412e-04, -6.24761506e-01, 3.30567462e+03])
 
-    if 1:
-        calibration_folder = '../videos/20180109_stereo_60_calibration/calibration_frames/'
-        test_folder = '../videos/20180109_stereo_60_calibration/distance_frames/'
+    if 0:
+        calibration_folder = '../videos/20180109_stereo_calibration_60deg_250mm/calibration_frames/'
+        test_folder = '../videos/20180109_stereo_calibration_60deg_250mm/distance_frames/'
         fileL = test_folder + 'distance_left_007.png'
         fileR = test_folder + 'distance_right_007.png'
         disparity_crop = [130, 1860, 60, 1160]
+        distance_calibration_poly = np.asarray([0, 1, 0])
+
+    if 0:
+        calibration_folder = '../videos/20180111_stereo_calibration_60deg_120mm/calibration_frames/'
+        test_folder = '../videos/20180111_stereo_calibration_60deg_120mm/distance_frames/'
+        fileL = test_folder + 'distance_left_007.png'
+        fileR = test_folder + 'distance_right_007.png'
+        disparity_crop = [0, -1, 0, -1]
         distance_calibration_poly = np.asarray([0, 1, 0])
 
     TUNE = 1

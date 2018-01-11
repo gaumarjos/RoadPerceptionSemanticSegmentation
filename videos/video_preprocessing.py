@@ -16,18 +16,7 @@ import tty
 import sys
 import termios
 
-"""
-def imread_crop(filename, ratio):
-    img = cv2.imread(filename)
-    x = img.shape[0]
-    y = img.shape[1]
-    newx = int((1.-ratio) * x / 2)
-    newy = int((1.-ratio) * y / 2)
-    img_cropped = img[newx:x-newx, newy:y-newy, :]
-    return img_cropped
-"""
-    
-    
+
 def crop_and_resize(img):
     desired_w = 1440
     desired_h = 896
@@ -111,10 +100,28 @@ frame_secs = [2, 14, 27, 30, 36, 47, 54, 60+3]
 #calibration_frame_secs = [1, 6, 9, 17, 22, 25, 32, 34, 47, 58, 60+8, 60+13, 60+20, 60+23, 60+30, 60+50, 60+55, 60+58, 120+1, 120+10, 120+13, 120+16, 120+18]
 #test_frame_secs = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20 ,22, 24, 26, 28, 30, 32 ,34, 36, 38, 40, 42, 44, 46, 48, 50, 52]
 
-# Relative to folder 20171201_stereo_2nd_calibration_at_TMG
 if 1:
-    master_folder = '20180109_stereo_60_calibration/'
+    master_folder = '20180111_stereo_calibration_60deg_120mm/'
+    extract_frames_from_video(master_folder,
+                              input_folder='calibration_videos/',
+                              left_basename='calibration_left',
+                              right_basename='calibration_right',
+                              frame_secs=[],
+                              i_start=0,
+                              output_folder='calibration_frames/',
+                              preprocess=0)
 
+    extract_frames_from_video(master_folder,
+                              input_folder='distance_videos/',
+                              left_basename='distance_left',
+                              right_basename='distance_right',
+                              frame_secs=[],
+                              i_start=0,
+                              output_folder='distance_frames/',
+                              preprocess=0)
+
+if 0:
+    master_folder = '20180109_stereo_calibration_60deg_250mm/'
     extract_frames_from_video(master_folder,
                               input_folder='calibration_videos/',
                               left_basename='calibration_left',
@@ -133,19 +140,18 @@ if 1:
                               output_folder='distance_frames/',
                               preprocess=2)
 
-"""
-    master_folder = '20171220_stereo_2nd_calibration_at_TMG/'
-    i=240
+if 0:
+    master_folder = '20171220_stereo_calibration_120deg_2/'
     extract_frames_from_video(master_folder,
                               input_folder='calibration_videos/',
                               left_basename='calibration_left',
                               right_basename='calibration_right',
-                              #frame_secs=[3, 9, 18, 34, 38, 41, 48, 52, 54, 56, 60, 60+5, 60+9, 60+15, 60+18, 60+21, 60+24,  60+27, 60+30, 60+33, 60+36, 60+41, 60+44, 60+47, 60+50, 60+53, 60+56, 60+60, 60+64, 60+70, 60+74, 60+77, 60+83, 60+86, 60+90, 60+93, 60+98, 60+103, 60+107, 180+8, 180+12, 180+16, 180+20, 180+26, 180+29, 180+32, 180+39, 180+42, 180+47, 180+50], # BIG BOARD
-                              #frame_secs=[i+27, i+31, i+34, i+37, i+40, i+46, i+49, i+54, i+57, i+60, i+63, i+65, i+68, i+71, i+74, i+77, i+79, i+82, i+86, i+90, i+94, i+96, i+99, i+103, i+106, i+109, i+113, i+120, i+124, i+127, i+129, i+138, i+140, i+146, i+149, i+151, i+153, i+165], # schmall BOARD
+                              # frame_secs=[3, 9, 18, 34, 38, 41, 48, 52, 54, 56, 60, 60+5, 60+9, 60+15, 60+18, 60+21, 60+24,  60+27, 60+30, 60+33, 60+36, 60+41, 60+44, 60+47, 60+50, 60+53, 60+56, 60+60, 60+64, 60+70, 60+74, 60+77, 60+83, 60+86, 60+90, 60+93, 60+98, 60+103, 60+107, 180+8, 180+12, 180+16, 180+20, 180+26, 180+29, 180+32, 180+39, 180+42, 180+47, 180+50], # BIG BOARD
+                              i=240
+                              frame_secs=[i+27, i+31, i+34, i+37, i+40, i+46, i+49, i+54, i+57, i+60, i+63, i+65, i+68, i+71, i+74, i+77, i+79, i+82, i+86, i+90, i+94, i+96, i+99, i+103, i+106, i+109, i+113, i+120, i+124, i+127, i+129, i+138, i+140, i+146, i+149, i+151, i+153, i+165], # schmall BOARD
                               i_start=1,
                               output_folder='calibration_frames_small/',
                               preprocess=1)
-
 
     extract_frames_from_video(master_folder,
                               input_folder='distance_indoor_videos/',
@@ -164,7 +170,6 @@ if 1:
                               i_start=1,
                               output_folder='distance_outdoor_frames/',
                               preprocess=1)
-"""
 
 if 0:
     preprocess_video(folder,
