@@ -169,7 +169,7 @@ if 1:
                               frame_secs=[4*60+13, 5*60+21, 6*60+54, 8*60+53, 9*60+38, 12*60+48],
                               i_start=0,
                               output_folder='test_frames/',
-                              preprocess=0)
+                              preprocess=1)
 
 if 0:
     preprocess_video(folder,
