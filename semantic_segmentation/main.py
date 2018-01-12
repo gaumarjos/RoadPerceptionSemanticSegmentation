@@ -702,7 +702,7 @@ if __name__ == '__main__':
         train_images_path_pattern = '../mapillary/data/training/images_processed_256x512/*_image.png'
         train_labels_path_pattern = '../mapillary/data/training/instances_processed_256x512/*_instance.png'
         # test_images_path_pattern  = '../mapillary/data/testing/*.jpg'  # Keep in mind these have all different sizes
-        test_images_path_pattern  = '../videos/20171220_stereo_calibration_120deg_390mm/test_frames/*.png'
+        test_images_path_pattern  = '../videos/20171220_stereo_calibration_120deg_390mm/test_frames/*_cropped.png'
         # test_images_path_pattern  = '../videos/20180111_stereo_calibration_60deg_120mm/test_frames/*.png'
 
     # This enables a faster (but slightly uglier, less saturated) code to paint on the output images and videos.
