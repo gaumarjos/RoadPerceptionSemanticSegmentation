@@ -55,12 +55,12 @@ class BM():
                  distance_calibration_poly=np.asarray([0, 1, 0]),
                  distance_calibration_invert=0):
         # Matcher
-        window_size = 5 # used to be 5
+        window_size = 5
         self.minDisparity = 0
         self.numDisparities = 128
         self.blockSize = window_size  # the old SADWindowSize
-        self.P1 = 8 * 3 * (window_size+0)**2  # used to be window_size**2 as suggested in the documentation
-        self.P2 = 32 * 3 * (window_size+0)**2
+        self.P1 = 8 * 3 * (window_size+2)**2  # used to be window_size**2 as suggested in the documentation
+        self.P2 = 32 * 3 * (window_size+2)**2
         self.disp12MaxDiff = 1
         self.uniquenessRatio = 10
         self.speckleWindowSize = 100
@@ -183,8 +183,8 @@ class BM():
 
     def calculate_depth_mm(self, disparity):
         localQ = self.Q.copy()
-        print(localQ)
-        print("Estimated distance between the two cameras: {:4.1f}mm".format(1/localQ[3,2]))
+        #print(localQ)
+        #print("Estimated distance between the two cameras: {:4.1f}mm".format(1/localQ[3,2]))
 
         # Rotate the image upside down for a clearer view in MeshLab
         localQ[1,:] = -1 * localQ[1,:]
@@ -204,7 +204,7 @@ class BM():
         # Prepare infinity mask to avoid MeshLab issues
         # infinity_mask = disparity > disparity.min() # TODO check is this is always 0 or can change
         infinity_mask = disparity > 0
-        print("Minimum value: {}".format(disparity.min()))
+        # print("Minimum value: {}".format(disparity.min()))
 
         # Make global variable to be used by the tuner
         self.points = points
@@ -409,6 +409,7 @@ class BM():
         # Mask based on specific labels (color values)
         if mask_type == 1:
             object_mask = np.full_like(colors[:,:,0], False, dtype=bool)
+            object_mask |= color2mask(colors, np.array([0, 192, 0])) # ground animal
             object_mask |= color2mask(colors, np.array([220, 20, 60])) # person
             object_mask |= color2mask(colors, np.array([255, 0, 0])) # bicyclist
             object_mask |= color2mask(colors, np.array([119, 11, 32])) # bicycle
@@ -456,9 +457,9 @@ class BM():
             mesh_filename = 'disparity'
             while os.path.isfile(mesh_filename + '.ply'):
                 mesh_filename = mesh_filename + '_'
-        print("Saving point cloud as {}...".format(mesh_filename + '.ply'))
+        print("Saving point cloud as {}...".format(mesh_filename + '.ply'), end="")
         write_ply(mesh_filename + '.ply', out_points, out_colors)
-        print("Done")
+        print(" done!")
         return
 
 
@@ -466,37 +467,41 @@ if __name__ == '__main__':
     print("OpenCV version: {}".format(cv2.__version__))
 
     TUNE = 0
+    MASK_TYPE = 1
+    SEGMENTED_BACKGROUND = 1
+    SHOW_DEPTH_MAP = 0
 
-    # for n in range(0,21):
-    # for n in [17]:
-    for n in range(0,6):
-
+    # for n in range(0,6):
+    # for n in [5]:
+    # for n in range(0,22):
+    for n in [21]:
+    
         # 120deg cameras, 390mm
-        if 1:
+        if 0:
             calibration_folder = '../videos/20171220_stereo_calibration_120deg_390mm/calibration_frames_small/'
             test_folder = '../videos/20171220_stereo_calibration_120deg_390mm/test_frames/'
             test_segmented_folder = '../videos/20171220_stereo_calibration_120deg_390mm/test_frames_segmented/'
             fileL = test_folder + 'test_left_{:03d}_cropped.png'.format(n)
             fileR = test_folder + 'test_right_{:03d}_cropped.png'.format(n)
-            fileB = test_segmented_folder + 'test_left_{:03d}_cropped.png'.format(n)
-            mask_type = 1
-            mesh_filename = fileL[:-4]
-            disparity_crop = [200, 1410, 0, 660]
+            if SEGMENTED_BACKGROUND:
+                fileB = test_segmented_folder + 'test_left_{:03d}_cropped.png'.format(n)
+            else:
+                fileB = fileL
+            disparity_crop = [200, 1410, 100, 660]
             distance_calibration_poly = np.asarray([2.57345412e-04, -6.24761506e-01, 3.30567462e+03])
             distance_calibration_invert = 0
 
         # 60deg camera, 120mm
-        if 0:
+        if 1:
             calibration_folder = '../videos/20180111_stereo_calibration_60deg_120mm/calibration_frames/'
             test_folder = '../videos/20180111_stereo_calibration_60deg_120mm/test_frames/'
             test_segmented_folder = '../videos/20180111_stereo_calibration_60deg_120mm/test_frames_segmented/'
             fileL = test_folder + 'test_left_{:03d}.png'.format(n)
             fileR = test_folder + 'test_right_{:03d}.png'.format(n)
-            # fileB = fileL  # to use the real photo
-            fileB = test_segmented_folder + 'test_left_{:03d}.png'.format(n)  # to use the segmented image
-            # fileB = test_segmented_folder + 'test_right_{:03d}.png'.format(n)  # to use the segmented image
-            mask_type = 0
-            mesh_filename = fileL[:-4]
+            if SEGMENTED_BACKGROUND:
+                fileB = test_segmented_folder + 'test_left_{:03d}.png'.format(n)  # to use the segmented image
+            else:
+                fileB = fileL
             disparity_crop = [130, 1890, 67, 1170]
             #distance_calibration_poly = np.asarray([9.18628104e-04, -1.74423770e+00, 3.32211320e+03])
             distance_calibration_poly = np.asarray([5.89577503e-13, 1.41653543e-07, -5.70583838e-04, 2.93477758e+00, -9.62542808e+02])
@@ -506,6 +511,8 @@ if __name__ == '__main__':
         imgR = cv2.imread(fileR)
         imgB = cv2.imread(fileB)
         imgB = cv2.resize(imgB, (imgL.shape[1], imgL.shape[0]), interpolation=cv2.INTER_NEAREST)
+        mesh_filename = fileL[:-4]
+        depthmap_filename = fileL[:-4] + '_depthmap.png'
 
         mycal = pickle.load(open(calibration_folder + "calibration.p", "rb"))
         block_matcher = BM(calibration=mycal,
@@ -520,10 +527,13 @@ if __name__ == '__main__':
             # Calculate
             disparity = block_matcher.calculate_disparity(imgL, imgR)
             points, infinity_mask, z_points_mm = block_matcher.calculate_depth_mm(disparity)
-            block_matcher.generate3Dimage(points, infinity_mask, imgB, mask_type, mesh_filename)
+            block_matcher.generate3Dimage(points, infinity_mask, imgB, MASK_TYPE, mesh_filename)
 
-            # Show
-            if 0:
-                fig = plt.figure(1)
-                plt.imshow(z_points_mm, cmap='hot', interpolation='nearest')
+            # Depth map
+            fig = plt.figure()
+            plt.imshow(z_points_mm/1000, cmap='hot', interpolation='nearest')
+            plt.colorbar()
+            plt.title('Depth map (m)')
+            plt.savefig(depthmap_filename, bbox_inches='tight')
+            if SHOW_DEPTH_MAP:
                 plt.show()
