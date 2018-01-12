@@ -100,7 +100,7 @@ frame_secs = [2, 14, 27, 30, 36, 47, 54, 60+3]
 #calibration_frame_secs = [1, 6, 9, 17, 22, 25, 32, 34, 47, 58, 60+8, 60+13, 60+20, 60+23, 60+30, 60+50, 60+55, 60+58, 120+1, 120+10, 120+13, 120+16, 120+18]
 #test_frame_secs = [2, 4, 6, 8, 10, 12, 14, 16, 18, 20 ,22, 24, 26, 28, 30, 32 ,34, 36, 38, 40, 42, 44, 46, 48, 50, 52]
 
-if 1:
+if 0:
     master_folder = '20180111_stereo_calibration_60deg_120mm/'
     """
     extract_frames_from_video(master_folder,
@@ -130,8 +130,9 @@ if 1:
                               output_folder='test_frames/',
                               preprocess=0)
 
-if 0:
+if 1:
     master_folder = '20171220_stereo_calibration_120deg_390mm/'
+    """
     i=240
     extract_frames_from_video(master_folder,
                               input_folder='calibration_videos/',
@@ -160,6 +161,15 @@ if 0:
                               i_start=1,
                               output_folder='distance_outdoor_frames/',
                               preprocess=1)
+    """
+    extract_frames_from_video(master_folder,
+                              input_folder='test_videos/',
+                              left_basename='test_left',
+                              right_basename='test_right',
+                              frame_secs=[4*60+13, 5*60+21, 6*60+54, 8*60+53, 9*60+38, 12*60+48],
+                              i_start=0,
+                              output_folder='test_frames/',
+                              preprocess=0)
 
 if 0:
     preprocess_video(folder,
