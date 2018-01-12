@@ -2,7 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # Measured - Calculated
-indoor_120 = np.asarray([[2933, 2510],
+"""
+# 120deg cameras
+data = np.asarray([[2933, 2510],
                      [3780, 3130],
                      [4769, 3800],
                      [5647, 4290],
@@ -16,7 +18,7 @@ indoor_120 = np.asarray([[2933, 2510],
                      [15229, 8320],
                      [16273, 8590]])
 
-outdoor_120 = np.asarray([[3188, 2720],
+data = np.asarray([[3188, 2720],
                       [4890, 3860],
                       [6261, 4670],
                       [8335, 5660],
@@ -27,49 +29,72 @@ outdoor_120 = np.asarray([[3188, 2720],
                       [20144, 9510],
                       [22545, 9860],
                       [24888, 10200]])
-                      
-outdoor_60 = np.asarray([[1650, ],
-                         [3330, ],
-                         [5160, ],
-                         [6983, ],
-                         [8740, ],
-                         [10557, ],
-                         [12628, ],
-                         [14992, ],
-                         [17416, ],
-                         [19699, ],
-                         [19997, ],
-                         [22595, ],
-                         [25424, ],
-                         [28217, ],
-                         [31020, ],
-                         [34055, ],
-                         [37304, ],
-                         [25864, ],
-                         [21921, ],
-                         [18906, ],
-                         [15393, ],
-                         [12057, ],
-                         [8945, ],
-                         [6463, ],
-                         [4168, ],
-                         [2784, ],
-                         [1616, ]])
 
-data = np.vstack((indoor, outdoor))
+# 60deg cameras, measured distance - disparity
+data = np.asarray([[21096, 48],
+                   [19728, 50],
+                   [18613, 52],
+                   [17620, 52],
+                 [16504, 53],
+                 [15200, 55],
+                 [13867, 59],
+                 [12715, 61],
+                 [11305, 64],
+                 [10060, 68],
+                 [8873, 73],
+                 [7544, 80],
+                 [6516, 87],
+                 [5244, 102],
+                 [3876, 127],
+                 [2934, 159],
+                 [2238, 202],
+                 ])
+"""
+
+# 60deg cameras, measured distance - reprojected distance
+data = np.asarray([[21096, 5440],
+                 [19728, 5220],
+                 [18613, 5020],
+                 [17620, 5020],
+                 [16504, 4920],
+                 [15200, 4740],
+                 [13867, 4580],
+                 [12715, 4280],
+                 [11305, 4080],
+                 [10060, 3840],
+                 [8873,  3570],
+                 [7544,  3260],
+                 [6516,  3000],
+                 [5244,  2560],
+                 [3876,  2050],
+                 [2934,  1660],
+                 [2238,  1300],
+                 ])
+
 print(data)
 
-p = np.polyfit(data[:,1], data[:,0], 2)
+x = np.asarray(data[:,1])
+y = np.asarray(data[:,0])
+x1 = 1/x
+
+p = np.polyfit(x, y, 4)
 print(p)
 
-r  = np.polyval(p, data[:,1]) - data[:,0]
+"""
+r = np.polyval(p, data[:,1]) - data[:,0]
 print(r)
+"""
+
+ideal = np.linspace(1000, 6000, num=100)
+ideal1 = 1/ideal
+l = np.polyval(p, ideal)
 
 
 fig = plt.figure(1)
 plt.plot(data[:,1], data[:,0], '.')
-plt.xlabel('Reprojected from disparity map')
-plt.ylabel('Laser (true) measurement')
+plt.plot(ideal, l)
+plt.xlabel('Re-projected Z from disparity map (mm)')
+plt.ylabel('Laser measurement (mm)')
 plt.grid(1)
 # plt.hist(r)
 plt.show()
