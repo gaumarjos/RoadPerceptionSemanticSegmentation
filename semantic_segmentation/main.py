@@ -702,14 +702,13 @@ if __name__ == '__main__':
         train_images_path_pattern = '../mapillary/data/training/images_processed_256x512/*_image.png'
         train_labels_path_pattern = '../mapillary/data/training/instances_processed_256x512/*_instance.png'
         # test_images_path_pattern  = '../mapillary/data/testing/*.jpg'  # Keep in mind these have all different sizes
-        #test_images_path_pattern  = '../videos/20171201_stereo_TMG/test_frames/*_cropped.png'  # To be used with the images recorded in Cologne
-        test_images_path_pattern  = '../videos/20171201_stereo_TMG/move_i3/*_cropped.png'  # To be used with the images recorded on TMG proving grounds
+        test_images_path_pattern  = '../videos/20180111_stereo_calibration_60deg_120mm/test_frames/*.png'
 
     # This enables a faster (but slightly uglier, less saturated) code to paint on the output images and videos.
     # The idea is to disable it when preparing images and videos for presentations.
-    # 0: just label colors
-    # 1: fast painting
-    # 2: slow painting (better saturation)
+    # 0: just label colors -> to be used with stereo vision
+    # 1: fast painting -> ok for most situations
+    # 2: slow painting -> better saturation
     image_painting_style = 0
 
     args = parse_args()
@@ -741,9 +740,10 @@ if __name__ == '__main__':
         image_shape = (256, 512)
         train(args, image_shape)
     elif args.action=='predict':
+        #image_shape = (256, 512)  # This was the original code, use this only if it makes sense with your image form factor
+        image_shape = (320, 512)  # Resized images, 1920x1208 would become 512x322, I'm using 320 as it's dividable by 32 and that's better for how the image is then segmented.
         print('images_paths={}'.format(args.images_paths))
-        #image_shape = (256, 512)
-        image_shape = (320, 512)
+        print('input images will be resized to {}'.format(image_shape))
         predict_files(args, image_shape)
     elif args.action == 'freeze':
         freeze_graph(args)
