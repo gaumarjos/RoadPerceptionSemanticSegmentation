@@ -256,7 +256,6 @@ class Calibration():
                                  "mapR2": self.mapR2,
                                  "Q": Q}
             pickle.dump(self.calibration, open(self.path + self.calibration_filename, "wb"))
-https://nerian.com/support/resources/calculator/
         return
         
 
@@ -269,12 +268,13 @@ if __name__ == '__main__':
     calibration_folder = '../videos/20180111_stereo_calibration_60deg_120mm/calibration_frames/'
     toskip = []
 
-    # square_size_in_mm = 40 when using the A3 checkerboard, 100 when using the A0 checkerboard
     cameras = Calibration(calibration_folder,
                           toskip=toskip,
                           #left_template='calibration_left_*_cropped.png',
-                          #right_template='calibration_right_*_cropped.png')
+                          #right_template='calibration_right_*_cropped.png',
                           left_template='calibration_left_*.png',
                           right_template='calibration_right_*.png',
-                          square_size_in_mm=100)
+                          #square_size_in_mm=40,  # when using the A3 checkerboard
+                          square_size_in_mm=100,  # when using the A0 checkerboard
+                          )
     cameras.calibrate(visual=True, save=True)
