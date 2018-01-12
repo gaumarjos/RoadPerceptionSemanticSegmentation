@@ -468,24 +468,28 @@ if __name__ == '__main__':
     TUNE = 0
 
     # for n in range(0,21):
-    for n in [17]:
+    # for n in [17]:
+    for n in range(0,6):
 
         # 120deg cameras, 390mm
-        if 0:
+        if 1:
             calibration_folder = '../videos/20171220_stereo_calibration_120deg_390mm/calibration_frames_small/'
-            test_folder = '../videos/20171220_stereo_calibration_120deg_390mm/distance_outdoor_frames/'
-            fileL = test_folder + 'distance_outdoor_left_003_cropped.png'
-            fileR = test_folder + 'distance_outdoor_right_003_cropped.png'
+            test_folder = '../videos/20171220_stereo_calibration_120deg_390mm/test_frames/'
+            test_segmented_folder = '../videos/20171220_stereo_calibration_120deg_390mm/test_frames_segmented/'
+            fileL = test_folder + 'test_left_{:03d}_cropped.png'.format(n)
+            fileR = test_folder + 'test_right_{:03d}_cropped.png'.format(n)
+            fileB = test_segmented_folder + 'test_left_{:03d}_cropped.png'.format(n)
+            mask_type = 1
+            mesh_filename = fileL[:-4]
             disparity_crop = [200, 1410, 0, 660]
             distance_calibration_poly = np.asarray([2.57345412e-04, -6.24761506e-01, 3.30567462e+03])
             distance_calibration_invert = 0
 
         # 60deg camera, 120mm
-        if 1:
+        if 0:
             calibration_folder = '../videos/20180111_stereo_calibration_60deg_120mm/calibration_frames/'
             test_folder = '../videos/20180111_stereo_calibration_60deg_120mm/test_frames/'
             test_segmented_folder = '../videos/20180111_stereo_calibration_60deg_120mm/test_frames_segmented/'
-            #n = 21
             fileL = test_folder + 'test_left_{:03d}.png'.format(n)
             fileR = test_folder + 'test_right_{:03d}.png'.format(n)
             # fileB = fileL  # to use the real photo
