@@ -49,7 +49,11 @@ class BM():
     """
     Initialization
     """
-    def __init__(self, calibration, disparity_crop=[0, -1, 0, -1], distance_calibration_poly=np.asarray([0, 1, 0])):
+    def __init__(self,
+                 calibration,
+                 disparity_crop=[0, -1, 0, -1],
+                 distance_calibration_poly=np.asarray([0, 1, 0]),
+                 distance_calibration_invert=0):
         # Matcher
         window_size = 5 # used to be 5
         self.minDisparity = 0
@@ -67,8 +71,8 @@ class BM():
         self.use_wls_filter = 1
 
         # Speckle Filter
-        self.speckle_maxSpeckleSize = 4000
-        self.speckle_maxDiff = 64
+        self.speckle_maxSpeckleSize = 10
+        self.speckle_maxDiff = 4
 
         # WLS Filter
         self.wls_lambda = 500000
@@ -82,6 +86,7 @@ class BM():
 
         # Distance calibration polynomial
         self.distance_calibration_poly = distance_calibration_poly
+        self.distance_calibration_invert = distance_calibration_invert
 
         # Create matchers
         self._create_matchers()
@@ -156,6 +161,9 @@ class BM():
             disparity_filtered = self.wls_filter.filter(np.int16(disparityL / 16.), undistorted_rectifiedL, None, np.int16(disparityR / 16.))
             disparity_filtered = cv2.normalize(src=disparity_filtered, dst=disparity_filtered, beta=0, alpha=255, norm_type=cv2.NORM_MINMAX)
             disparity_filtered = np.uint8(disparity_filtered)
+            # EXPERIMENTAL: try final filtering to make the image less noisy
+            # disparity_filtered, _ = cv2.filterSpeckles(disparity_filtered, 0, self.speckle_maxSpeckleSize, self.speckle_maxDiff)
+
             self.disparity_scaled = disparity_filtered
         else:
             # Unfiltered
@@ -188,7 +196,10 @@ class BM():
         # Estimate distance
         #x_points_mm = np.polyval(self.distance_calibration_poly, points[:,:,0])
         #y_points_mm = np.polyval(self.distance_calibration_poly, points[:,:,1])
-        z_points_mm = np.polyval(self.distance_calibration_poly, -points[:,:,2])
+        if self.distance_calibration_invert:
+            z_points_mm = np.polyval(self.distance_calibration_poly, -1/points[:,:,2])
+        else:
+            z_points_mm = np.polyval(self.distance_calibration_poly, -points[:,:,2])
 
         # Prepare infinity mask to avoid MeshLab issues
         # infinity_mask = disparity > disparity.min() # TODO check is this is always 0 or can change
@@ -277,8 +288,8 @@ class BM():
         cv2.createTrackbar("speckleWindowSize", self.windowNameD, self.speckleWindowSize, 1000, self._change_speckleWindowSize)
         cv2.createTrackbar("speckleRange", self.windowNameD, self.speckleRange, 100, self._change_speckleRange)
         cv2.createTrackbar("preFilterCap", self.windowNameD, self.preFilterCap, 100, self._change_preFilterCap)
-        #cv2.createTrackbar("speckle_maxSpeckleSize", self.windowNameD, self.speckle_maxSpeckleSize, 10000, self._change_speckle_maxSpeckleSize)
-        #cv2.createTrackbar("speckle_maxDiff", self.windowNameD, self.speckle_maxDiff, 256, self._change_speckle_maxDiff)
+        cv2.createTrackbar("speckle_maxSpeckleSize", self.windowNameD, self.speckle_maxSpeckleSize, 10000, self._change_speckle_maxSpeckleSize)
+        cv2.createTrackbar("speckle_maxDiff", self.windowNameD, self.speckle_maxDiff, 256, self._change_speckle_maxDiff)
         cv2.createTrackbar("wls_lambda (/1000)", self.windowNameD, int(self.wls_lambda/1000), 1000, self._change_wls_lambda)
         cv2.createTrackbar("wls_sigma (/10)", self.windowNameD, int(self.wls_sigma*10), 40, self._change_wls_sigma)
         cv2.setMouseCallback(self.windowNameD, self._save_cloud_function)  # Right click on the image to save the point cloud
@@ -360,7 +371,10 @@ class BM():
     """
     Method to save the point cloud in a format that an be opened by MeshLab
     """
-    def generate3Dimage(self, points, infinity_mask, imgB):
+    def generate3Dimage(self, points, infinity_mask, imgB, mask_type=0, mesh_filename=None):
+
+        def color2mask(image, color):
+            return np.array(cv2.inRange(image, color, color), dtype=bool)
 
         def write_ply(fn, verts, colors):
             ply_header = '''ply
@@ -381,10 +395,8 @@ class BM():
                 f.write((ply_header % dict(vert_num=len(verts))).encode('utf-8'))
                 np.savetxt(f, verts, fmt='%f %f %f %d %d %d ')
 
-        basename = 'disparity'
-
         # Translate and rectify the background image to fit the depth map
-        Tmatrix = np.float32([[1,0,-40],[0,1,0]])
+        Tmatrix = np.float32([[1,0,0],[0,1,0]])
         rows, cols, _ = imgB.shape
         imgB = cv2.warpAffine(imgB, Tmatrix, (cols,rows))
         undistorted_rectified_background = cv2.remap(imgB, self.mapR1, self.mapR2, interpolation=cv2.INTER_LINEAR)
@@ -395,15 +407,38 @@ class BM():
         colors = colors[self.crop_top:self.crop_bottom,self.crop_left:self.crop_right]
 
         # Mask based on specific labels (color values)
-        car = np.array([0, 0, 142])
-        mask_car = np.array(cv2.inRange(colors, car, car), dtype=bool)
-        person = np.array([220, 20, 60])
-        mask_person = np.array(cv2.inRange(colors, person, person), dtype=bool)
-        sky = np.array([70, 130, 180])
-        mask_sky = np.logical_not(np.array(cv2.inRange(colors, sky, sky), dtype=bool))
-
-        # object_mask = mask_car + mask_person
-        object_mask = mask_sky
+        if mask_type == 1:
+            object_mask = np.full_like(colors[:,:,0], False, dtype=bool)
+            object_mask |= color2mask(colors, np.array([220, 20, 60])) # person
+            object_mask |= color2mask(colors, np.array([255, 0, 0])) # bicyclist
+            object_mask |= color2mask(colors, np.array([119, 11, 32])) # bicycle
+            object_mask |= color2mask(colors, np.array([0, 0, 142])) # boat
+            object_mask |= color2mask(colors, np.array([0, 60, 100])) # bus
+            object_mask |= color2mask(colors, np.array([0, 0, 142])) # car
+            object_mask |= color2mask(colors, np.array([0, 0, 90])) # caravan
+            object_mask |= color2mask(colors, np.array([0, 0, 230])) # motorcycle
+            object_mask |= color2mask(colors, np.array([0, 80, 100])) # onrails
+            object_mask |= color2mask(colors, np.array([128, 64, 64])) # othervehicle
+            object_mask |= color2mask(colors, np.array([0, 0, 110])) # trailer
+            object_mask |= color2mask(colors, np.array([0, 0, 70])) # truck
+            object_mask |= color2mask(colors, np.array([0, 0, 192])) # wheeledslow
+        elif mask_type == -1:
+            object_mask = np.full_like(colors[:,:,0], True, dtype=bool)
+            object_mask &= np.logical_not(color2mask(colors, np.array([70, 130, 180]))) # sky
+            object_mask &= np.logical_not(color2mask(colors, np.array([196, 196, 196]))) # curb
+            object_mask &= np.logical_not(color2mask(colors, np.array([170, 170, 170]))) # curb cut
+            object_mask &= np.logical_not(color2mask(colors, np.array([96, 96, 96]))) # pedestrianarea
+            object_mask &= np.logical_not(color2mask(colors, np.array([128, 64, 128]))) # road
+            object_mask &= np.logical_not(color2mask(colors, np.array([110, 110, 110]))) # servicelane
+            object_mask &= np.logical_not(color2mask(colors, np.array([244, 35, 232]))) # sidewalk
+            object_mask &= np.logical_not(color2mask(colors, np.array([200, 128, 128]))) # linescrosswalk
+            object_mask &= np.logical_not(color2mask(colors, np.array([255, 255, 255]))) # linesgeneral
+            object_mask &= np.logical_not(color2mask(colors, np.array([152, 251, 152]))) # Terrain
+            object_mask &= np.logical_not(color2mask(colors, np.array([0, 170, 30]))) # Water
+            object_mask &= np.logical_not(color2mask(colors, np.array([32, 32, 32]))) # Car Mount
+            object_mask &= np.logical_not(color2mask(colors, np.array([0, 0, 0]))) # unlabeled
+        else:
+            object_mask = np.full_like(colors[:,:,0], True, dtype=bool)
         mask = np.logical_and(infinity_mask, object_mask)
 
         """
@@ -415,10 +450,14 @@ class BM():
 
         out_points = self.points[mask]
         out_colors = colors[mask]
-        while os.path.isfile(basename + '.ply'):
-            basename = basename + '_'
-        print("Saving point cloud as {}".format(basename + '.ply'))
-        write_ply(basename + '.ply', out_points, out_colors)
+
+        # Save mesh
+        if mesh_filename is None:
+            mesh_filename = 'disparity'
+            while os.path.isfile(mesh_filename + '.ply'):
+                mesh_filename = mesh_filename + '_'
+        print("Saving point cloud as {}...".format(mesh_filename + '.ply'))
+        write_ply(mesh_filename + '.ply', out_points, out_colors)
         print("Done")
         return
 
@@ -426,53 +465,61 @@ class BM():
 if __name__ == '__main__':
     print("OpenCV version: {}".format(cv2.__version__))
 
-    # 120deg cameras
-    if 1:
-        calibration_folder = '../videos/20171220_stereo_calibration_120deg_2/calibration_frames_small/'
-        test_folder = '../videos/20171220_stereo_calibration_120deg_2/distance_outdoor_frames/'
-        fileL = test_folder + 'distance_outdoor_left_003_cropped.png'
-        fileR = test_folder + 'distance_outdoor_right_003_cropped.png'
-        disparity_crop = [200, 1410, 0, 660]
-        distance_calibration_poly = np.asarray([2.57345412e-04, -6.24761506e-01, 3.30567462e+03])
+    TUNE = 0
 
-    if 0:
-        calibration_folder = '../videos/20180109_stereo_calibration_60deg_250mm/calibration_frames/'
-        test_folder = '../videos/20180109_stereo_calibration_60deg_250mm/distance_frames/'
-        fileL = test_folder + 'distance_left_007.png'
-        fileR = test_folder + 'distance_right_007.png'
-        disparity_crop = [130, 1860, 60, 1160]
-        distance_calibration_poly = np.asarray([0, 1, 0])
+    # for n in range(0,21):
+    for n in [17]:
 
-    if 0:
-        calibration_folder = '../videos/20180111_stereo_calibration_60deg_120mm/calibration_frames/'
-        test_folder = '../videos/20180111_stereo_calibration_60deg_120mm/distance_frames/'
-        fileL = test_folder + 'distance_left_007.png'
-        fileR = test_folder + 'distance_right_007.png'
-        disparity_crop = [0, -1, 0, -1]
-        distance_calibration_poly = np.asarray([0, 1, 0])
+        # 120deg cameras, 390mm
+        if 0:
+            calibration_folder = '../videos/20171220_stereo_calibration_120deg_390mm/calibration_frames_small/'
+            test_folder = '../videos/20171220_stereo_calibration_120deg_390mm/distance_outdoor_frames/'
+            fileL = test_folder + 'distance_outdoor_left_003_cropped.png'
+            fileR = test_folder + 'distance_outdoor_right_003_cropped.png'
+            disparity_crop = [200, 1410, 0, 660]
+            distance_calibration_poly = np.asarray([2.57345412e-04, -6.24761506e-01, 3.30567462e+03])
+            distance_calibration_invert = 0
 
-    TUNE = 1
+        # 60deg camera, 120mm
+        if 1:
+            calibration_folder = '../videos/20180111_stereo_calibration_60deg_120mm/calibration_frames/'
+            test_folder = '../videos/20180111_stereo_calibration_60deg_120mm/test_frames/'
+            test_segmented_folder = '../videos/20180111_stereo_calibration_60deg_120mm/test_frames_segmented/'
+            #n = 21
+            fileL = test_folder + 'test_left_{:03d}.png'.format(n)
+            fileR = test_folder + 'test_right_{:03d}.png'.format(n)
+            # fileB = fileL  # to use the real photo
+            fileB = test_segmented_folder + 'test_left_{:03d}.png'.format(n)  # to use the segmented image
+            # fileB = test_segmented_folder + 'test_right_{:03d}.png'.format(n)  # to use the segmented image
+            mask_type = 0
+            mesh_filename = fileL[:-4]
+            disparity_crop = [130, 1890, 67, 1170]
+            #distance_calibration_poly = np.asarray([9.18628104e-04, -1.74423770e+00, 3.32211320e+03])
+            distance_calibration_poly = np.asarray([5.89577503e-13, 1.41653543e-07, -5.70583838e-04, 2.93477758e+00, -9.62542808e+02])
+            distance_calibration_invert = 0
 
-    #fileB = segmented_test_folder + 'move_left_024_cropped.png'  # to use the segmented image
-    fileB = fileL  # to use the real photo
-    imgL = cv2.imread(fileL)
-    imgR = cv2.imread(fileR)
-    imgB = cv2.imread(fileB)
+        imgL = cv2.imread(fileL)
+        imgR = cv2.imread(fileR)
+        imgB = cv2.imread(fileB)
+        imgB = cv2.resize(imgB, (imgL.shape[1], imgL.shape[0]), interpolation=cv2.INTER_NEAREST)
 
-    mycal = pickle.load(open(calibration_folder + "calibration.p", "rb"))
-    block_matcher = BM(calibration=mycal,
-                       disparity_crop=disparity_crop,
-                       distance_calibration_poly=distance_calibration_poly)
-    if TUNE:
-        block_matcher.tuner(imgL, imgR, imgB)
+        mycal = pickle.load(open(calibration_folder + "calibration.p", "rb"))
+        block_matcher = BM(calibration=mycal,
+                           disparity_crop=disparity_crop,
+                           distance_calibration_poly=distance_calibration_poly,
+                           distance_calibration_invert=distance_calibration_invert,
+                           )
+        if TUNE:
+            block_matcher.tuner(imgL, imgR, imgB)
 
-    if not TUNE:
-        # Calculate
-        disparity = block_matcher.calculate_disparity(imgL, imgR)
-        points, infinity_mask, z_points_mm = block_matcher.calculate_depth_mm(disparity)
-        block_matcher.generate3Dimage(points, infinity_mask, imgB)
+        if not TUNE:
+            # Calculate
+            disparity = block_matcher.calculate_disparity(imgL, imgR)
+            points, infinity_mask, z_points_mm = block_matcher.calculate_depth_mm(disparity)
+            block_matcher.generate3Dimage(points, infinity_mask, imgB, mask_type, mesh_filename)
 
-        # Show
-        fig = plt.figure(1)
-        plt.imshow(z_points_mm, cmap='hot', interpolation='nearest')
-        plt.show()
+            # Show
+            if 0:
+                fig = plt.figure(1)
+                plt.imshow(z_points_mm, cmap='hot', interpolation='nearest')
+                plt.show()
