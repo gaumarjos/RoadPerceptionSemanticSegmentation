@@ -91,10 +91,11 @@ l = np.polyval(p, ideal)
 
 
 fig = plt.figure(1)
-plt.plot(data[:,1], data[:,0], '.')
+plt.plot(x, y, '.')
 plt.plot(ideal, l)
-plt.xlabel('Re-projected Z from disparity map (mm)')
+plt.xlabel('Re-projected Z from disparity map')
 plt.ylabel('Laser measurement (mm)')
+plt.title('Real-world distance calibration')
 plt.grid(1)
 # plt.hist(r)
 plt.show()
