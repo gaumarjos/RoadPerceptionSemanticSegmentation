@@ -194,8 +194,8 @@ class BM():
         points = cv2.reprojectImageTo3D(disparity, localQ)
 
         # Estimate distance
-        #x_points_mm = np.polyval(self.distance_calibration_poly, points[:,:,0])
-        #y_points_mm = np.polyval(self.distance_calibration_poly, points[:,:,1])
+        # x_points_mm = np.polyval(self.distance_calibration_poly, -points[:,:,0])
+        # y_points_mm = np.polyval(self.distance_calibration_poly, -points[:,:,1])
         if self.distance_calibration_invert:
             z_points_mm = np.polyval(self.distance_calibration_poly, -1/points[:,:,2])
         else:
@@ -469,12 +469,12 @@ if __name__ == '__main__':
     TUNE = 0
     MASK_TYPE = 1
     SEGMENTED_BACKGROUND = 1
-    SHOW_DEPTH_MAP = 0
+    SHOW_DEPTH_MAP = 1
 
     # for n in range(0,6):
     # for n in [5]:
     # for n in range(0,22):
-    for n in [21]:
+    for n in [12]:
     
         # 120deg cameras, 390mm
         if 0:
