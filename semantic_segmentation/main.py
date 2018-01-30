@@ -49,7 +49,7 @@ elif dataset == "mapillary":
 USE_TF_BATCHING = True
 
 
-def load_trained_vgg_vars(sess):
+def load_vgg(sess):
     """
     Load Pretrained VGG Model into TensorFlow.
     :param sess: TensorFlow Session
@@ -204,7 +204,7 @@ def train(args, image_shape):
 
     # extract pre-trained VGG weights
     with tf.Session(config=config) as sess:
-        var_values = load_trained_vgg_vars(sess)
+        var_values = load_vgg(sess)
     tf.reset_default_graph()
     
     # This portion of the code is enabled only if USE_TF_BATCHING is enabled
